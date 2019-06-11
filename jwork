@@ -1,0 +1,28 @@
+#!/bin/bash
+# exclusive_lock.sh
+lockfile=`vasppbs | grep tmpdir | sed 's/set tmpdir = //;s/"//g;s/$SCRATCH//'`
+#lockfile=`vasppbs | grep tmpdir | sed 's/set tmpdir = //'
+file="$1" 
+filenum="$1"".num" 
+filerun="$1"".run" 
+nn=`wc -l <$file`
+(
+   flock -x 200
+   #flock -x 200
+   if [ -f $filenum ] ; then
+     n=`tail -1 $filenum | awk '{print $1}'`
+   else
+     n=0
+   fi
+   if [ $n -lt $nn ]; then
+     ((n=n+1))
+     echo $n >$filenum
+     rec=`head -$n $file | tail -1`
+     echo $rec `date` >>$filerun
+     echo $rec `date`
+   else
+     echo "alljobdone"
+   fi
+   sleep 1s
+) 200> $SCRATCH/$lockfile
+cat $SCRATCH/$lockfile

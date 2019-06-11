@@ -1,0 +1,49 @@
+#!/bin/tcsh
+#
+unalias rm
+unalias mv
+unalias cp
+set outcar = "OUTCAR.gz"
+set oszicar = "OSZICAR"
+if ( -e $outcar ) then
+  set nTHz = `zgrep THz $outcar | tail -1 | awk '{print $1}'`
+  if ( "$nTHz" >= 192 ) then
+    if ( ! -e $oszicar ) goto getout1
+    set line = `grep "E0=" -a $oszicar -n | head -1`
+    if ( "$line" == "" ) goto getout1
+    set n1 = `echo $line | sed 's/:/ /g' | awk '{print $1}'`
+    @ n1 = "$n1" - 1
+    set line1 = `head -$n1 $oszicar | tail -1`
+    set ddE = `echo $line1 | awk '{print $4}' | sed 's/^-//g' | sed 's/E-/-/g' | sed 's/-/E-/g'`
+    set dE = `ari -n -f %.0f $ddE x  5.e3 | tr -d '-'`
+    set nTHz = `zcat $outcar | grep THz | grep "f/i=" | wc -l`
+    endif
+    if ( "$nTHz" <= 6 ) then
+      if ( "$dE" < 5 ) goto getout0
+      goto getout1
+    else
+      if ( "$dE" == 0 ) then
+        goto getout0
+      else
+echo "not convergent electronic step" >>Convergence
+        goto getout1
+      endif
+    endif
+  else
+    goto getout1
+  endif
+else
+  goto getout2
+endif
+
+getout0:
+echo "0"
+exit
+
+getout1:
+echo "1"
+exit
+
+getout2:
+echo "2"
+exit

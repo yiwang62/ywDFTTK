@@ -1,0 +1,176 @@
+#!/bin/tcsh
+#
+
+set OFILE = "OSZICAR"
+set CFILE = "CONTCAR"
+set www = `pwd`
+
+unalias rm
+unalias cp
+unalias mv
+set s = "`pwd`"
+set h = $s:t
+set nnode = 32
+set mem = 60000
+set neb = 1
+set ppn = 32
+set knl = ""
+set walltime = "24:00"
+if ( "$NERSC_HOST" == "edison" ) then
+  set nnode = 24
+  set ppn = 24
+  set walltime = "48:00"
+endif
+
+set add = '&'
+set pbsop = ""
+set njob = 16
+set nvol = 4
+set kpar = ""
+set nbands = ""
+set lauto = ""
+set prec = ""
+set symprec = ""
+set scale = ""
+set bigjob = ""
+set rerun = ""
+set nesting = ""
+set nesttime = ""
+set imix = ""
+set aaaa = ""
+set mag2 = ""
+foreach option ( $* )
+  if (x$1 == "x-node") then
+    shift
+    set nnode="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-kpar") then
+    shift
+    set kpar = "-kpar $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-MAG2") then
+    set mag2 = "-MAG2"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-nesttime") then
+    shift
+    set nesttime = "-nesttime $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-NBANDS") then
+    shift
+    set nbands = "-NBANDS $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-AAAA") then
+    shift
+    set aaaa = "-AAAA $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-LAUTO" ) then
+    set lauto = "-LAUTO"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-SYMPREC" ) then
+    set symprec = "-SYMPREC"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-prec") then
+    shift
+    set prec = "-prec $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-dir") then
+    shift
+    set phases = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-mem") then
+    shift
+    set mem = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-njob") then
+    shift
+    set njob = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-nvol") then
+    shift
+    set nvol = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-W") then
+    shift
+    set walltime = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-scale") then
+    shift
+    set scale = "-scale $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-ppn") then
+    shift
+    set ppn = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-knl") then
+    set knl = "-knl"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-IMIX") then
+    shift
+    set imix = "-IMIX $www/$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-bigjob") then
+    set bigjob = "-bigjob"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-rerun") then
+    set rerun = "-rerun"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-nesting") then
+    set nesting = "-nesting"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else
+    set pbsop = "$pbsop $1"
+    if ( "$#argv" != 0 ) shift
+  endif
+end
+
+set nestfile = "$s/nestfile"
+if ( -e $nestfile ) then
+  rm $nestfile
+endif
+
+set file = "$s/jobfile"
+echo -n >$file
+
+foreach dir ( $phases )
+#foreach dir ( V*/PBEsol/ )
+#foreach dir ( tI6*/PBEsol/ )
+  if ( ! -e $dir/tplate ) continue
+
+  cd $dir
+    #time set JOBS = "`vaspprun $pbsop`"
+    set JOBS = "`vaspprun $pbsop`"
+    set nJOBS = `echo "$JOBS" | grep AllJobDone | wc -l`
+    #if ( "$JOBS" != "AllJobDone" ) then
+    if ( "$nJOBS" == 0 ) then
+      echo $JOBS
+      cd phonon
+      #echo jrun $imix $symprec $kpar $nbands $lauto $prec $scale $bigjob $rerun $nesting -W $walltime -node $nnode -ppn $ppn -mem $mem "$knl" -nestfile $nestfile
+      #time jrun $nesttime $aaaa $imix $symprec $kpar $nbands $lauto $prec $scale $bigjob $rerun $nesting -W $walltime -node $nnode -ppn $ppn -mem $mem "$knl" -nestfile $nestfile >>$file
+      jrun $nesttime $aaaa $imix $symprec $kpar $mag2 $nbands $lauto $prec $scale $bigjob $rerun $nesting -W $walltime -node $nnode -ppn $ppn -mem $mem "$knl" -nestfile $nestfile >>$file
+    else
+      #echo "`pwd` AllJobDone"
+      echo "`pwd` $JOBS"
+    endif
+  cd $www
+end
