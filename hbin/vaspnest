@@ -1,0 +1,199 @@
+#!/bin/tcsh
+unalias rm
+
+set www = `pwd`
+set ecl = "`grep "$www" ~/bin/hbin/eclIN718.dat`"
+if ( "$ecl" != "" ) then
+  echo "0"
+  goto unlock
+endif
+
+set tmpdir = `qqcd`
+set outcar =  $tmpdir/OUTCAR
+set contcar =  $tmpdir/CONTCAR
+set incar =  $tmpdir/INCAR
+set tdir = $outcar:h
+set t0 = 0
+if ( -e $outcar ) then
+  set done = `grep "General timing and accounting informations for this job:" $outcar | wc -l`
+  if ( "$done" != 0 ) then
+    echo "1"
+    exit
+  endif
+  set t0 = `stat -c %Y $outcar`
+endif
+
+if ( -e Convergence ) then
+  set rconver = `grep "Static Calculation Started" Convergence | tail -1`
+  set conver = `grep "convergent ionic step" Convergence | tail -1`
+  if ( "$rconver" == "" ) then
+  if ( "$conver" != "" ) then
+    echo "Static Calculation Started" >Convergence
+  endif
+  endif
+endif
+
+set houtcar = "OUTCAR.gz"
+set hcontcar = "CONTCAR"
+set hoszicar = "OSZICAR"
+
+if ( "$1" != "" ) then
+  set tttt = "$1"
+else
+  set tttt = "8200"
+endif
+
+
+#if ( -e $tmpdir ) then
+  if ( -e LOCKED ) then
+    @ dt = `stat -c %Y LOCKED` - `date +%s`
+    if ( "$dt" < -172800 ) then
+      rm LOCKED
+      echo "1"
+      goto unlock
+    else
+      set ferror = `ls -lt $tmpdir/*.error | & head -1 | awk '{print $9}'`
+      if ( -e $ferror ) then
+        @ dt = `stat -c %Y $ferror` - `stat -c %Y LOCKED`
+        if ( "$dt" > 0 ) then
+          set killed = `grep SIGTERM $ferror | wc -l`
+          if ( "$killed" > 0 ) then
+            rm LOCKED
+            echo "1"
+            goto unlock
+          endif
+        endif
+      endif
+      echo "0"
+      goto unlock
+    endif
+  else
+    echo "1"
+    goto unlock
+  endif
+#else
+#    echo "1"
+#    exit
+#endif
+
+set now0 = `date +%s`
+
+@ now = "$now0" - "$t0"
+
+if ( "$now" < "$tttt" ) then
+  echo "0"
+  goto unlock
+else
+  if ( -e nested_run ) then
+    set t2 = "`grep $YHOST nested_run`"
+    if ( "$t2" == "" ) then
+      set t1 = `stat -c %Y nested_run`
+      @ t1 = "$now0" - "$t1"
+      if ( "$t1" < 172800 ) then
+        if ( -e Bigjob ) rm Bigjob
+        echo "0"
+        goto unlock
+      endif
+    endif
+  endif
+  if ( -e $outcar ) then
+    set nl = `grep IBRION $outcar | head -1 | awk '{print $3}'`
+    if ( "$nl" >= 6 ) then
+      if ( "$1" != "" ) then
+        if ( "$now" < "$1" ) then
+          echo "0"
+          goto unlock
+        else
+          goto getout3
+        endif
+      else if ( "$now" < 8200 ) then
+        #bigjob skipped for 4 days
+        echo "0"
+        goto unlock
+      else
+        set t00 = `stat -c %Y $incar`
+        @ bigjob = "$t0" - "$t00"
+        if ( "$bigjob" > 129600 ) then
+          # it is a big job
+          echo >Bigjob
+          echo "0"
+          goto unlock
+        else if ( "$bigjob" < 43200 ) then
+          goto getout3
+        else if ( "$now" <172800 ) then
+          echo "0"
+          goto unlock
+        else
+          echo "1"
+          goto unlock
+        endif
+      endif
+      goto unlock
+    endif
+  endif
+  set hhhh = "`pwd`"
+  if ( -e $outcar ) then
+  if ( ! -z $outcar ) then
+      cd $tdir
+        vaspcopyconvergence -workdir $hhhh
+      cd $hhhh
+  endif
+  endif
+  echo "1"
+endif
+
+goto unlock
+
+getout0:
+echo "0"
+goto unlock
+
+getout100:
+echo "100"
+goto unlock
+
+getout1:
+echo "1"
+goto unlock
+
+getout2:
+echo "2"
+goto unlock
+
+getout3:
+if ( -e $houtcar ) then
+  set nTHz = `zcat $houtcar | grep THz | tail -1 | awk '{print $1}'`
+  if ( "$nTHz" >= 192 ) then
+    if ( ! -e  $outcar ) goto getout0
+    if ( ! -e $hoszicar ) goto getout1
+    set line = `grep "E0=" -a $hoszicar -n | head -1`
+    if ( "$line" == "" ) goto getout1
+    set n1 = `echo $line | sed 's/:/ /g' | awk '{print $1}'`
+    @ n1 = "$n1" - 1
+    set line1 = `head -$n1 $hoszicar | tail -1`
+    set ddE = `echo $line1 | awk '{print $4}' | sed 's/^-//g' | sed 's/E-/-/g' | sed 's/-/E-/g'`
+    set dE = `ari -n -f %.0f $ddE x  5.e3 | tr -d '-'`
+    set nTHz = `zcat $houtcar | grep THz | grep "f/i=" | wc -l`
+    if ( -e NotConvergence ) then
+      rm NotConvergence
+    endif
+    if ( "$nTHz" <= 6 ) then
+      if ( "$dE" < 5 ) goto getout0
+      goto getout1
+    else
+      if ( "$dE" == 0 ) then
+        goto getout0
+      else
+        echo "not convergent electronic step" >NotConvergence
+        goto getout1
+      endif
+    endif
+  else
+    goto getout1
+  endif
+else
+  goto getout2
+endif
+
+unlock:
+exit

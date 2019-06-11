@@ -1,0 +1,68 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+set x = $s:h
+set d = $x:t
+set indir = $h$d
+set pFR = _FR
+set pKP = 16000
+set pT0 = 0
+set pT1 = 1600
+set pdT = 10
+
+set pline = ""
+
+foreach option ( $* )
+  if (x$1 == "x-h") then
+    echo "USAGE: dvib     [-kp kppra]"
+    echo "                [-fr FR]"
+    echo "                [-T0 t0]"
+    echo "                [-T1 T1]"
+    echo "                [-dT dT]"
+    exit
+  endif
+  if (x$1 == "x-kp") then
+    shift
+    set pKP=$1
+    shift
+    continue
+  else if (x$1 == "x-fr") then
+    shift
+    if ( x$1 != "Default" ) set pFR=$1
+    shift
+    continue
+  else if (x$1 == "x-T0") then
+    shift
+    set pT0=$1
+    shift
+    continue
+  else if (x$1 == "x-T1") then
+    shift
+    set pT1=$1
+    shift
+    continue
+  else if (x$1 == "x-dT") then
+    shift
+    set pdT=$1
+    shift
+    continue
+  else if (x$1 == "x-p") then
+    shift
+    set indir = "$1"
+    shift
+    continue
+  else if ($#argv == "0") then
+    break
+  else
+#    echo "********ERROR: Unknown option $1"
+    set pline = "$pline $1"
+    shift
+    if ($#argv != "0") continue
+  endif
+end
+
+cd $indir
+FITFC -fr=$pFR -kp=$pKP -T0=$pT0 -T1=$pT1 -dT=$pdT -f -fn
+cd ..
+atatTh -p $indir $pline

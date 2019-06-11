@@ -1,0 +1,147 @@
+#!/bin/tcsh -f
+#
+
+set s = "`pwd`"
+set h = $s:t
+set x = $s:h
+set d = $x:t
+
+set indir = $h$d
+set Pressure = "0.0"
+set Imode = "-int2"
+set mode = "vdos"
+
+set elec = "_e"
+foreach option ( $* )
+  if (x$1 == "x-h") then
+    echo "USAGE: atatTh [-e] "
+    echo "       -p indir     "
+    exit
+  else if (x$1 == "x-e") then
+    set elec = "_e"
+    shift
+    continue
+  else if (x$1 == "x-p") then
+    shift
+    set indir = "$1"
+    shift
+    continue
+  else if (x$1 == "x-vdos") then
+    set mode = "vdos"
+    shift
+    continue
+  else if (x$1 == "x-fitf") then
+    set mode = "fitf"
+    shift
+    continue
+  else if (x$1 == "x-int0") then
+    set Imode = "$1"
+    shift
+    continue
+  else if (x$1 == "x-int1") then
+    set Imode = "$1"
+    shift
+    continue
+  else if (x$1 == "x-int2") then
+    set Imode = "$1"
+    shift
+    continue
+  else if (x$1 == "x-Pr") then
+    shift
+    set Pressure = "$1"
+    shift
+    continue
+  else if ( "$#argv" != 0 ) then
+    shift
+  endif
+end
+
+unalias cp
+unalias rm
+
+set pwd = `pwd`
+set DATADIR = "$pwd/$indir"
+set Dt = $DATADIR:t 
+set Dh = $DATADIR:h 
+set WORKDIR = "$Dh/thermo-$Dt"
+
+if ( ! ( -e $WORKDIR ) ) mkdir $WORKDIR
+
+	set nt = `wc -l $DATADIR/fitfc.out | awk '{print $1}'`
+	set t0 = `head -1 $DATADIR/fitfc.out | awk '{print $1}'`
+	set t1 = `tail -1 $DATADIR/fitfc.out | awk '{print $1}'`
+	set td = `head -2 $DATADIR/fitfc.out | tail -1 | awk '{print $1}'`
+
+set n_vol = 0
+foreach dir ( $DATADIR/vol_* )
+
+    set pfile = $dir/POSCAR.static
+    set efile = $dir/OSZICAR.static
+    set dfile = $dir/DOSCAR.static
+
+    if ( ! ( -e $efile ) ) then
+        set pfile = $dir/POSCAR
+        set efile = $dir/OSZICAR
+        set dfile = $dir/DOSCAR
+    endif
+
+    if ( ! ( -e $efile ) ) then
+        set pfile = $dir/../POSCAR.static
+        set efile = $dir/../OSZICAR.static
+        set dfile = $dir/../DOSCAR.static
+    endif
+
+    if ( ! ( -e $efile ) ) then
+        set pfile = $dir/../POSCAR
+        set efile = $dir/../OSZICAR
+        set dfile = $dir/../DOSCAR
+    endif
+
+    if ( -e $efile && ! (-z $efile) ) then
+	@ n_vol = "$n_vol" + 1
+        set vol = `vasp_volume <$pfile`
+        set tn = `printf "%012.6f%s" "$vol" ".vol"`
+
+        set e = `tail -2 $efile | grep "E0=" | awk '{print $5}'`
+        set energy = `ari -n  $e `
+
+	set dp = '"'
+	echo "$vol" "$energy" "$dp$dir$dp" >$WORKDIR/$tn
+        if ($elec == "_e") then
+	  cd $dir; atatdos $t0 $t1 $td <$dfile; cd $pwd
+        endif
+        set l_poscar = $pfile
+    endif
+end
+
+        set line = `head -6 $l_poscar | tail -1`
+	set natom = 0
+	foreach i ( $line )
+		@ natom = "$natom" + "$i"
+	end
+
+  echo " $natom $nt $n_vol" > $WORKDIR/data.in
+
+  cd $DATADIR
+  echo $nt | awk ' { \
+      {nn=$1;} \
+      for (i=1; i<=nn; i++) \
+      { getline < "fitfc.out"; a[1,i]=$1; a[2,i]=$2; a[4,i]=$3; } \
+      for (i=1; i<=nn; i++) { getline < "svib"; a[3,i]=$1;} \
+    } \
+    { for (i=1; i<=nn; i++) { print a[1,i], a[2,i], a[3,i], a[4,i] } \
+    }' >>$WORKDIR/data.in
+  cd $pwd
+
+cat $WORKDIR/*.vol >>$WORKDIR/data.in
+rm $WORKDIR/*.vol
+
+cd $WORKDIR
+#set line = "fitf fitf_e fvib fvib_e vdos vdos_e"
+set line = "$mode $mode""_e"
+foreach i ( $line ) 
+  atatsum $i $Imode -Pr $Pressure <data.in >$i
+end
+cd $pwd
+
+

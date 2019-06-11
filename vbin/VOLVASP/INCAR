@@ -1,0 +1,8 @@
+System = phonon of Zr bcc - omiga
+
+NWRITE = 0
+
+IBRION = 2
+
+EDIFF=_EDIFF
+

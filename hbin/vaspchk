@@ -1,0 +1,282 @@
+#!/bin/tcsh
+#
+set s = "`pwd`"
+set h = $s:t
+unalias mv
+unalias rm
+set www = `pwd`
+
+set oszicar = "OSZICAR"
+set contcar = "CONTCAR"
+set outcar = "OUTCAR"
+set workdir = "./"
+#set lthr = 10
+set lthr = 5000
+set ethr = 10000
+
+foreach o ( $* )
+  if (x$1 == "x-workdir") then
+    shift
+    set workdir = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-CONTCAR") then
+    shift
+    set contcar = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-OSZICAR") then
+    shift
+    set oszicar = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-OUTCAR") then
+    shift
+    set outcar = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-lthr") then
+    shift
+    set lthr = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-ethr") then
+    shift
+    set ethr = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else
+    if ( "$#argv" != 0 ) shift
+  endif
+end
+
+
+set dir = FeC14Re/
+set dir = SIGMA_Cr10V4Cr16/
+set dir = Fe3Re-mp-865212/
+set dir = */
+#set dir = Al/
+#set dir = "deltaW/"
+foreach d ( $dir )
+  if ( ! -e $www/$d/tplate ) continue
+  if ( ! -e $www/$d/used22.dat ) then
+    if ( -e $www/$d/good22.dat ) rm $www/$d/good22.dat
+    continue
+  endif
+
+  if ( -e $www/$d/good22.dat ) then
+    if ( "`stat -c %Y $www/$d/good22.dat`" >= "`stat -c %Y $www/$d/used22.dat`" ) continue
+  endif
+
+  if ( -e $www/$d/good22.dat ) then
+    set nl = `wc -l < $www/$d/good22.dat`
+    if ( "$nl" >= 7 ) then
+       #echo " good22 found for $d nl=$nl"
+       continue
+    else if ( "$nl" == 0 ) then
+      rm $www/$d/good22.dat
+    endif
+  endif
+
+  echo -n > $www/$d/tmp22.dat
+  cd $www/$d
+    set ii = 0
+    foreach ee ( `awk '{print $3}' used22.dat` )
+      @ ii = "$ii" + 1
+      set dd = "V$ee"
+      cd $www/$d/$dd
+        echo -n "$d$dd : "
+#        vaspcheckconvergence
+
+if ( ! -e $oszicar ) goto out0
+if ( ! -e $contcar ) goto out0
+if ( -z $oszicar ) goto out0
+if ( -z $contcar ) goto out0
+set nl = `wc -l <$contcar`
+if ( "$nl" <= 9 ) goto out0
+
+set line = `grep "E0=" -a $oszicar -n | tail -1`
+if ( "$line" == "" ) goto out0
+
+set ddE = `echo $line | awk '{print $9}' | sed "s/=//g"`
+set dE = `ari -n -f %.0f $ddE x  $lthr | tr -d '-'`
+
+set n1 = `echo $line | sed 's/:/ /g' | awk '{print $1}'`
+if ( "$dE" != 0 ) then
+  set n3 = `grep "E0=" -a $oszicar | wc -l`
+  if ( "$n3" != 1 ) goto out0
+  set n2 = `wc -l <$oszicar`
+  if ( "$n1" != "$n2" ) goto out0
+endif
+
+@ n1 = "$n1" - 1
+set line1 = "`head -$n1 $oszicar | tail -1`"
+set ddE = `echo $line1 | awk '{print $4}'`
+set dE = `ari -n -f %.0f $ddE x  $ethr | tr -d '-'`
+
+if ( "$dE" != 0 ) then
+  if ( -e RelaxConvergent ) rm RelaxConvergent
+  goto out0
+endif
+
+#set pwdc = $www/$dir/$d
+#set pwdc = `pwd`
+#set WWWW = /global/project/projectdirs/m891/yiwang62
+#set tmpdir =  $SCRATCH/`pwd | sed "s|$WWWW|prj|g;s|/|_|g"`
+set PRJ = ""
+if ( $?WORKPRJ ) then
+  set PRJ = "$WORKPRJ"
+endif
+set tmpdir =  $SCRATCH/`pwd | sed "s|$HOME/||g;s|$WORK/|$PRJ|g;s|/|_|g"`
+set ibzkpt =  $tmpdir/IBZKPT
+set toszicar =  $tmpdir/OSZICAR
+set toutcar =  $tmpdir/OUTCAR
+set tdoscar =  $tmpdir/DOSCAR
+
+set nk = 0
+#if ( ! -e $ibzkpt ) goto checkrelax
+#if ( ! -e $toutcar ) goto checkrelax
+#if ( ! -e $toszicar ) goto checkrelax
+#if ( ! -e $tdoscar ) goto checkrelax
+
+set  sameosz = 9
+if ( -e $toszicar ) then
+if ( ! -z $toszicar ) then
+  set sameosz = "`diff $toszicar $oszicar | wc -l`"
+endif
+endif
+
+if ( "$sameosz" == 0 ) then
+if ( -e $ibzkpt ) then
+if ( ! -z $ibzkpt ) then
+  set line = `grep "Tetrahedra" $ibzkpt -n | tail -1`
+  if ( "$line" != "" ) then
+    set n1 = `echo $line | sed 's/:/ /g' | awk '{print $1}'`
+    set nk = `head -$n1 $ibzkpt | awk '{print $4}' | awk '{total += $0} END{print total}'`
+  else
+    set nk = `awk '{print $4}' $ibzkpt | awk '{total += $0} END{print total}'`
+  endif
+  set natom = `head -7 $tmpdir/POSCAR | tail -1 | awk '{ nn=0; for (i=1; i<=NF; i++) nn += $i; print nn;}'`
+  @ nk = "$nk" * "$natom"
+            set t00 = 0
+            if ( -e $toutcar ) then
+              set t00 = `stat -c %Y $toutcar`
+            endif
+            set t11 = 0
+            if ( -e $outcar ) then
+              set t11 = `stat -c %Y $outcar`
+            endif
+
+            if ( "$t11" < "$t00" ) then
+	      cp $toutcar .
+              set goutcar = $toutcar
+            endif
+
+            set dif = `stat -c %Y $tdoscar`
+            set set ndos1 = `wc -l <$tdoscar`
+            if ( ( -e DOSCAR ) && ( ! -z DOSCAR ) ) then
+              if ( "$ndos1" > 10 ) then
+                set t1 = `stat -c %Y DOSCAR`
+                @ dif =  "$t1" - "$dif"
+              endif
+            else
+              if ( "$ndos1" > 10 ) then
+                set dif = -1
+              endif
+            endif
+
+            if ( "$dif" < 0 ) then
+              cp $tdoscar .
+            endif
+endif
+endif
+endif
+
+
+if ( ! -e $outcar ) set outcar = "OUTCAR.gz"
+if ( ! -e $outcar ) set outcar = "Static.gz"
+if ( ! -e $outcar ) goto checkrelax
+if ( -z $outcar ) goto checkrelax
+
+set zipped = `file $outcar | grep "gzip compressed data"`
+
+if ( "$zipped" != "" ) then
+  set enmax = `zcat $outcar | grep ENMAX -a | tr -d ';' | sort -k3 -n | tail -1 | awk '{print $3}' | sort -n | tail -1`
+  set encut = `zcat $outcar | grep ENCUT -a | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+  set ismear = `zcat $outcar | grep SMEAR -a | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+else
+  if ( $?goutcar ) then
+    set enmax = `grep ENMAX $goutcar -a | tr -d ';' | sort -k3 -n | tail -1 | awk '{print $3}' | sort -n | tail -1`
+    set encut = `grep ENCUT $goutcar -a | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+    set ismear = `grep SMEAR $goutcar -a | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+    unset goutcar
+  else
+    set enmax = `grep ENMAX $outcar -a | tr -d ';' | sort -k3 -n | tail -1 | awk '{print $3}' | sort -n | tail -1`
+    set encut = `grep ENCUT $outcar -a | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+    set ismear = `grep SMEAR $outcar -a | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+  endif
+endif
+
+if ( -e ../tplate/INCAR.Static ) then
+  set en0 = `grep ENCUT ../tplate/INCAR.Static | sed "s/ENCUT//;s/=//"`
+  set high = `ari -n -f %.0f $encut - $en0 / $enmax x 100 +25.01`
+else
+  set high = `ari -n -f %.0f $encut - $enmax / $enmax x 100`
+endif
+if ( ("$high" >= "25") && ("$ismear" == "-5") ) then
+  if ( "$nk" != 0 ) then
+    echo "StaticConvergent $nk $NERSC_HOST"
+    echo "StaticConvergent $nk $NERSC_HOST" > StaticConvergent
+  else if ( -e StaticConvergent ) then
+    cat StaticConvergent
+  else
+    echo "StaticConvergent $nk Unknown"
+    echo "StaticConvergent $nk Unknown" > StaticConvergent
+  endif
+  echo "RelaxConvergent $nk $NERSC_HOST" > RelaxConvergent
+  head -$ii $www/$d/used22.dat | tail -1 >> $www/$d/tmp22.dat
+else if ( -e StaticConvergent ) then
+  echo "*****not convergent"
+  rm StaticConvergent
+else
+  goto checkrelax
+endif
+
+continue
+
+checkrelax:
+
+  if ( "$nk" != 0 ) then
+    echo "RelaxConvergent $nk $NERSC_HOST"
+    echo "RelaxConvergent $nk $NERSC_HOST" > RelaxConvergent
+  else if ( -e RelaxConvergent ) then
+    cat RelaxConvergent
+  else
+    echo "RelaxConvergent $nk Unknown"
+    echo "RelaxConvergent $nk Unknown" > RelaxConvergent
+  endif
+
+  continue
+
+out0:
+
+echo ""
+
+    end
+
+    set nl = `wc -l < $www/$d/tmp22.dat`
+    if ( "$nl" >= 5 ) then
+      if ( -e $www/$d/good22.dat ) then
+        set dif = "`diff $www/$d/tmp22.dat $www/$d/good22.dat`"
+        if ( "$dif" != "" ) then
+          mv $www/$d/tmp22.dat $www/$d/good22.dat
+          echo " updated good22.dat for $www/$d "
+        endif
+      else
+          mv $www/$d/tmp22.dat $www/$d/good22.dat
+          echo " new good22.dat for $www/$d "
+      endif
+    endif
+    if ( -e $www/$d/tmp22.dat ) rm $www/$d/tmp22.dat
+
+end

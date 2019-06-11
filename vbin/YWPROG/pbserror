@@ -1,0 +1,13 @@
+#!/bin/csh -f
+
+set h = $1:h
+set hs = "$h"/vasp.out.static
+set hr = "$h"/vasp.out.relax
+
+if (-e "$hs" && !(-z "$hs")) then
+  pbserrph "$1" "$2" "$hs"
+else if (-e "$hr" && !(-z "$hr")) then
+  pbserrph "$1" "$2" "$hr"
+else
+  pbserr "$1" "$2"
+endif

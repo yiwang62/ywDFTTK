@@ -1,0 +1,126 @@
+#!/bin/tcsh
+#
+set PY = "PYPATH"
+set PY = "/global/project/projectdirs/m891/yiwang62/EV/bin/"
+
+set dir = "debye"
+if ( ! -e $dir ) mkdir $dir
+set dat = $dir/data.in
+echo -n \".\" 1 1 > $dat
+#ecmd -vol -Morse | grep param | awk '{printf " %lf", $3}' >>$dat
+ecmd -vol -BMvol | grep param | awk '{printf " %lf", $3}' >>$dat
+echo >>$dat
+
+unalias cp
+unalias mv
+unalias rm
+
+set t0 = 0
+set t1 = 2000
+set td = 10
+
+foreach option ( $* )
+  if (x$1 == "x-h") then
+    echo "USAGE: edos     [ OSZICAR ]"
+    echo "                [-natom natom ]"
+    echo "                [-m ]"
+    exit
+  else if (x$1 == "x-t0") then
+    shift
+    set t0 = "$1"
+    shift
+    continue
+  else if (x$1 == "x-t1") then
+    shift
+    set t1 = "$1"
+    shift
+    continue
+  else if (x$1 == "x-td") then
+    shift
+    set td = "$1"
+    shift
+    continue
+  endif
+end
+
+set q = '"'
+set nt = `ari -n -f %.0f $t1 - $t0 / $td + 1`
+
+set ELE = $dir/energy.ele
+set RUN = $dir/run
+set dosdir = $dir/DOS
+if ( ! -e $dosdir ) mkdir $dosdir
+
+echo -n >t.m.p.file
+set nv = 0
+
+set OFILE = "Static.OSZ"
+set CFILE = "Static.CON"
+set DFILE = "Static.DOS.gz"
+
+foreach d ( V* )
+
+    set ofo = $d/$OFILE
+    set ofc = $d/$CFILE
+    set ofd = $d/$DFILE
+   if ( -e $ofc ) then
+   if ( -e $ofc ) then
+   if ( -e $ofd ) then
+zcat $ofd >DOSCAR
+set ndos = `wc -l DOSCAR | awk '{print $1}'`
+
+set line = `head -6 $ofc | tail -1`
+set _x = `echo $line | awk '{print $1}' | sed 's/[^0-9]//g'`
+if ( "$_x" == "" ) then
+  set line = `head -7 $ofc | tail -1`
+endif
+
+set natom = `echo $line | awk '{ nn=0; for (i=1; i<=NF; i++) nn += $i; print nn;}'`
+
+set volume = `vasp_volume <$ofc`
+set vol = `ari -n $volume / $natom`
+  set ofe = $dosdir/$vol.ele
+  if ( $ndos > 5 ) then
+    if ( ! -e $ofe ) then
+      echo -n " $ofe ... "
+      atatdos -xdn -2.0 -xup 2.0 -nx 5001 -t0 $t0 -t1 $t1 -td $td < DOSCAR
+      awk -v natom=$natom '{print $1,$2/natom,$3/natom}' fvib_ele >$ofe
+      echo " done"
+    else
+      echo  " $ofe exist "
+    endif
+    if ( -z $ofe ) set noelec
+  else
+    set noelec
+  endif
+  echo 1 $vol $q$ofe$q >>t.m.p.file
+  echo 1 $vol $q$ofe$q
+  @ nv = $nv + 1
+   endif
+   endif
+   endif
+end
+
+  echo $nv $nt >$ELE
+  sort -g -k 2 t.m.p.file >>$ELE
+
+set vmin = `sort -g -k 2 t.m.p.file | head -1 | awk '{print $2}'`
+set vmax = `sort -g -k 2 t.m.p.file | tail -1 | awk '{print $2}'`
+
+rm DOSCAR
+rm t.m.p.file
+
+set ele = `head -6 tplate/POSCAR | tail -1`
+set Nele = `head -7 tplate/POSCAR | tail -1`
+set amass = `python $PY/getDymass.py -elements "$ele" -Nelements "$Nele"`
+set elec = ""
+if ( $?noelec ) set elec = "-noelec"
+cat <<end.end >$RUN
+#!/bin/tcsh
+#
+#
+set opt = "$elec -dfac 0.67 -BMvol -vmin $vmin -vmax $vmax -amass $amass -alam -1 -nx 101 -nt 201 -t1 2000 -s data.in 1 1 -pmode 1.0"
+  ceWY -iprint 10 -malpha 0 -nomag \$opt
+end.end
+
+chmod u+x $RUN

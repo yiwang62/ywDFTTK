@@ -1,0 +1,16 @@
+#!/bin/csh -f
+#
+set ppx = "`pwd`"
+
+foreach ee ( STRAIN_LIST )
+foreach hh ( STRAIN_TYPE )
+
+    set d = X"$hh""$ee"
+
+        cd $d
+	    dvib $*
+       	cd $ppx
+
+end
+end
+

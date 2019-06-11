@@ -1,0 +1,52 @@
+#!/bin/csh -f
+#
+
+set OFILE = "OSZICAR"
+set natom = 1
+foreach option ( $* )
+  if (x$1 == "x-h") then
+    echo "USAGE: ecom     [ OSZICAR ]"
+    echo "                [-n natom ]"
+    echo "                [-m ]"
+    exit
+  else if (x$1 == "x-mag") then
+    shift
+    set magnetic
+    continue
+  else if (x$1 == "x-norelax") then
+    shift
+    set norelax
+    continue
+  else if (x$1 == "x-n") then
+    shift
+    set natom = "$1"
+    shift
+    continue
+  else if (x$1 != "x") then
+    set OFILE = "$1"
+    if ( $#argv != 0 ) shift
+  endif
+end
+
+foreach ee ( STR* )
+    set d = "$ee"
+    set ofi = $d/$OFILE
+   if ( -e $ofi ) then
+      if ( $?norelax ) then
+        set et = `grep "E0=" $ofi | head -1 | awk '{print $5}'`
+        set em = `grep "E0=" $ofi | head -1 | awk '{print $10}'`
+      else
+        set et = `grep "E0=" $ofi | tail -1 | awk '{print $5}'`
+        set em = `grep "E0=" $ofi | tail -1 | awk '{print $10}'`
+      endif
+      if ( $et != "" ) then
+        set e = `ari -n $et/$natom`
+        if ( $?magnetic ) then
+          echo " $ee $e $em"
+        else
+          echo " $ee $e"
+        endif
+      endif
+    endif
+end
+

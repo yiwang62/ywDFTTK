@@ -1,0 +1,91 @@
+#!/bin/csh
+
+set STR2POS = "/global/homes/y/yiwang62/bin/SQSVASP/str2pos"
+
+set GGA="/usr/global/msc/vasp/pot_GGA/elements/"
+set LDA="/usr/global/msc/vasp/pot_LDA/elements/"
+set GGA_PAW="/usr/global/msc/vasp/potpaw_GGA/"
+set LDA_PAW="/usr/global/msc/vasp/potpaw_LDA/"
+set GGA_PAW_PBE="/usr/global/msc/vasp/potpaw_PBE/"
+
+set STR = "str.out"
+set POTPATH="$GGA"
+set POT = "GGA"
+
+foreach option ( $* )
+  if (x$1 == "x-p") then
+    shift
+    set POT = "$1"
+    shift
+  else if (x$1 == "x-s") then
+    shift
+    set STR = "$1"
+    shift
+  endif
+end
+
+if ( $POT == "GGA" ) then
+  set POTPATH = "$GGA"
+else if ( $POT == "LDA" ) then
+  set POTPATH = "$LDA"
+else if ( $POT == "GGA_PAW" ) then
+  set POTPATH = "$GGA_PAW"
+else if ( $POT == "LDA_PAW" ) then
+  set POTPATH = "$LDA_PAW"
+else if ( $POT == "GGA_PAW_PBE" ) then
+  set POTPATH = "$GGA_PAW_PBE"
+endif
+
+if (! -e $STR ) then
+  echo Cannot open file |$STR|
+  exit
+endif
+
+$STR2POS <$STR >str.tmp
+
+set Title = `pwd`
+set Date = `date`
+cat <<! >POSCAR
+Title: $Date $Title
+ 1.00
+!
+head -3 str.tmp >cell.tmp
+tail +4 str.tmp | sort -k 4 >pos.tmp
+
+awk '{nb_atom[$4]++} END {for (atom in nb_atom) {print atom,nb_atom[atom]}}' pos.tmp | sort >! atom.tmp
+( cat cell.tmp ; \
+  echo `awk '{print $2}' atom.tmp` ; \
+  echo Direct; \
+  awk '{print $1,$2,$3}' pos.tmp \
+) >> POSCAR
+
+echo -n  >! POTCAR
+foreach element ( `sed 's/[+-].*$//g' atom.tmp | awk '{print $1}'` )
+  if ( -e $POTPATH/$element/POTCAR ) then
+    cat $POTPATH/$element/POTCAR >>! POTCAR
+  else
+    zcat $POTPATH/$element/POTCAR.Z >>! POTCAR
+  endif
+  if ( $status == 1 ) then
+    echo Cannot read $POTPATH/$element/POTCAR\*
+    exit 1
+  endif
+end
+
+set mag = `awk '{print $1}' <atom.tmp | tr -d :A-z: | wc -w`
+#echo $mag
+if ( $mag != "0" ) then
+  cat atom.tmp | sed 's/^[^-+]*//g' | awk '{print $2,"*",$1+0}' |  tr -d " " \
+        >t.m.p.magfile
+  echo "ISPIN=2" >> INCAR
+  echo -n "MAGMOM = " >> INCAR
+  foreach i ( "`cat t.m.p.magfile`" )
+    echo -n " $i" >> INCAR
+  end
+  echo "" >> INCAR
+  \rm t.m.p.magfile
+endif
+
+
+rm -f atom.tmp cell.tmp pos.tmp str.tmp
+#rm -f cell.tmp pos.tmp str.tmp

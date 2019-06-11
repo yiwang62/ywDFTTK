@@ -1,0 +1,196 @@
+#!/bin/tcsh
+#
+set nnode = 128
+set neb = 1
+set ppn = 72
+set walltime = "36:00"
+endif
+set queue = "regular"
+set V5 = "V5.4"
+set VTST = ""
+#set ver = ".11_tbdyn"
+#set ver = "vasp/5.3.3-intel12"
+#set ver = "vasp/5.3.3-pgi"
+set ver = "vasp/5.3.5"
+set ver = ""
+
+foreach option ( $* )
+  if (x$1 == "x-node") then
+    shift
+    set nnode="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-Gamma") then
+    set Gamma
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-vtst") then
+    set VTST = "-vtst"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-ncl") then
+    set ncl = "-ncl"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-V5.3") then
+    set ver = ""
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-nojust") then
+    set nojust = 1
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-neb") then
+    shift
+    set neb="$1"
+    set VTST = "-vtst"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-NP") then
+    shift
+    set NP="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-mem") then
+    shift
+    set mem="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-ppn") then
+    shift
+    set ppn="$1"
+    set ppnset
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-JN") then
+    shift
+    set prefix="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-Q") then
+    shift
+    set queue="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-W") then
+    shift
+    set walltime="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-notmpdir") then
+    if ( "$#argv" != 0 ) shift
+    set notmpdir = 1
+    continue
+  else if (x$1 == "x-nopbs") then
+    if ( "$#argv" != 0 ) shift
+    set nopbs = 1
+    continue
+  else
+    if ( "$#argv" == 0 ) break
+    set walltime="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  endif
+end
+
+    if ( $?NP ) then
+      if ( "$nnode" > "$NP" ) then
+        set nnode = $NP
+      endif
+      if ( "$ppn" > "$nnode" ) then
+        set ppn = $nnode
+      endif
+    endif
+
+  @ npp = "$nnode" / "$ppn"
+  if ( $npp < 1 ) then
+	set ppn = $nnode
+  endif
+  @ npp = "$nnode" / "$ppn"
+  @ NNN = "$npp" / "$neb"
+  if ( $NNN < 1 ) then
+	set NNN = 1
+  endif
+  @ npp = "$NNN" * "$neb"
+  @ nnode = "$npp" * "$ppn"
+
+set out = ' >& BV.out'
+
+#echo "#\!/bin/csh"
+echo "#\!/bin/tcsh"
+echo "#SBATCH -p $queue"
+echo "#SBATCH -N ""$npp"
+echo "#SBATCH --ntasks-per-node=""$ppn"
+if ($?knl) then
+  echo "$knl"
+else
+  echo "#SBATCH -C haswell"
+endif
+echo "#SBATCH -t ""$walltime"":00"
+if ($?mem) then
+  echo "#SBATCH --mem=""$mem"
+endif
+
+#echo "module load vasp/5.2"
+#echo "module load usg"
+if ( "$VTST" == "-vtst" ) then
+  echo "module load vasp/5.3.5_vtst"
+else if ( "$V5" == "V5.4" ) then
+  if ( "$ver" == "" ) then
+    echo "module load vasp/5.4.1"
+  else
+    #echo "module load vasp/5.2.11"
+    #echo "module load vasp/5.2.12"
+    echo "module load $ver`"
+  endif
+else
+  echo "module load vasp/4.6.35.pkent"
+endif
+
+
+  if ( ! ( -e "$SCRATCH" ) ) mkdir "$SCRATCH"
+  set SCRATCH_ROOT = '$SCRATCH'
+  set quote = '"'
+#  set vasp = "aprun -n $nnode -N $ppn /usr/common/usg/vasp/5.2/bin/vasp"
+#  set vasp = "aprun -n $nnode -N $ppn /u0/z/zz217/USG/vasp/4.6.35.pkent/bin/vasp"
+#  set vasp = "aprun -n $nnode -N $ppn /usr/common/usg/vasp/4.6.35.pkent/bin/vasp"
+if ( "$VTST" == "-vtst" ) then
+  set vasp = "srun -n $nnode vasp"
+else if ( "$V5" == "V5.4" ) then
+  #set vasp = "aprun -n $nnode -N $ppn /global/common/edison/usg/vasp/5.3.3/bin/vasp"
+  #set vasp = "srun -n $nnode -N $ppn vasp_std"
+  #set vasp = "srun -n $nnode vasp_std"
+  #set vasp = "srun -n $nnode /usr/common/software/vasp/5.4.1/bin/vasp_std"
+  if ($?Gamma) then
+    set vasp = "srun -n $nnode vasp_gam"
+  else if ($?ncl) then
+    set vasp = "srun -n $nnode vasp_ncl"
+  else
+    set vasp = "srun -n $nnode vasp_std"
+  endif
+  set vaspncl = "srun -n $nnode vasp_ncl"
+else
+  #set vasp = "aprun -n $nnode -N $ppn /usr/common/usg/vasp/4.6.35.pkent/bin/vasp"
+  set vasp = "aprun -n $nnode -N $ppn ~/bin/vasp.4.6.35.pkent"
+endif
+#  set vasp = "aprun -n $nnode -N $ppn /usr/common/usg/vasp/5.2/bin/vasp"
+#  set vasp = "aprun -n $nnode /usr/common/usg/vasp/5.2/bin/vasp"
+  set hhhh = $HOME"/"
+  set pwdc = `pwd`
+  set Name = $pwdc:t
+  set tpwd = `echo $pwdc | sed "s|$hhhh||g;s|/|_|g;s|_global_u2_y_yiwang62_||g;s|_global_project_projectdirs_m891_yiwang62|prj|g"`
+        set PRJ = ""
+        if ( $?WORKPRJ ) then
+          set PRJ = "$WORKPRJ"
+        endif
+#echo PRJ= "$PRJ:
+#exit
+        set tpwd =  `pwd | sed "s|$HOME/||g;s|$WORK/|$PRJ|g;s|/|_|g"`
+
+echo "set VSPCMD = $quote""$vasp""$quote"
+echo "set VSPCMDNCL = $quote""$vaspncl""$quote"
+echo "set tmpdir = $quote$SCRATCH_ROOT/$tpwd$quote"
+echo "unalias cp"
+echo "unalias rm"
+echo "unalias mv"
+

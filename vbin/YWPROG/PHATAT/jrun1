@@ -1,0 +1,39 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+set x = $s:h
+set d = $x:t
+
+unalias cp
+unalias rm
+set vspcmd = '$VSPCMD'
+
+set WORKDIR = "`pwd`/$h$d"
+if ( !(-e $WORKDIR) ) mkdir $WORKDIR
+cd $WORKDIR
+
+vasppbs $* >B-"$h"
+
+set q = '$'N
+cat <<end.end >>B-"$h"
+cd $WORKDIR
+
+setenv VSPCMD "$vspcmd"
+setenv VSPGGA _POTGGA
+setenv VSPLDA _POTLDA
+
+cp ../vasp.wrap1 vasp.wrap
+cp ../str.out .
+set N = 0
+while ( "$q" < _NRELAX )
+runstruct_vasp
+cp str_relax.out str.out
+@ N = "$q" + 1
+end
+
+_VSHIFT
+
+end.end
+        chmod u+x B-"$h"
+        qsub B-"$h"

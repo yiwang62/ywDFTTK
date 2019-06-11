@@ -1,0 +1,15 @@
+#!/bin/tcsh -f
+#
+unalias cp
+set VSHIFT = `ari -n 1 - $1`
+set zero = `ari -n -f %.0f $VSHIFT - 1 x 100000.`
+if ( $zero != "0" ) then
+  head -3 str.out | awk -v pp=$VSHIFT '{printf "%.10lf %.10lf %.10lf\n",$1*pp, $2*pp, $3*pp}' > t.m.p.str.out
+  tail +4 str.out >>t.m.p.str.out
+  mv t.m.p.str.out str_relax.out
+  cp str_relax.out str.out
+  grep -v ISIF ../vasp.wrap1 > vasp.wrap
+  echo "ISIF=4" >>vasp.wrap
+  runstruct_vasp
+  cp str_relax.out str.out
+endif

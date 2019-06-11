@@ -1,0 +1,42 @@
+#!/bin/tcsh
+#
+set version = v0
+
+    if ( "$1" != "" ) then
+        if ( -d $1 ) then
+            cd $1
+        endif
+    endif
+
+    if ( ! $?SCRATCH ) then
+      set SCRATCH = "/gpfs/scratch/`whoami`"
+    endif
+
+if ( "$version" == "v0" ) then
+    set PRJ = ""
+    if ( $?WORKPRJ ) then
+      set PRJ = "$WORKPRJ"
+    endif
+    set wwww = ""
+    if ( $?WORK ) then
+      set wwww = "$WORK"
+    endif
+    set tmpdir =  $SCRATCH/`pwd | sed "s|$HOME/||g;s|$wwww/|$PRJ|g;s|/|_|g"`
+else
+    set tmpdir = $SCRATCH/`pwd | sed "s|/|_|g"`
+endif
+
+    set pwdc = `pwd`
+    if ( $pwdc:h == $SCRATCH ) then
+        set hh = `echo $pwdc:t | sed "s^_^/^g"`
+        if ( -e $hh ) then
+	    echo $hh
+        else if ( -e workdir ) then
+            cat workdir
+        endif
+    else 
+        if ( -e $tmpdir ) then
+            echo `pwd` >$tmpdir/workdir
+        endif
+        echo $tmpdir
+    endif

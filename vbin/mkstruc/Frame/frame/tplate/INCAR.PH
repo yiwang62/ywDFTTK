@@ -1,0 +1,13 @@
+SYSTEM = cinebwork
+PREC   = A
+ISMEAR = 0; SIMGA  = 0.1
+NSW    = 1
+EDIFF  = 1E-6 
+LWAVE  = .FALSE.
+LCHARG = .FALSE.
+ISPIN  = 2
+ISIF   = 0
+#NELMIN = 4
+IBRION = 6
+#SYMPREC=1.e-12
+ALGO=F

@@ -1,0 +1,11 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+
+foreach ee ( STR* )
+
+    set d = "$ee"
+    \cp $1 $d/. 
+end
+

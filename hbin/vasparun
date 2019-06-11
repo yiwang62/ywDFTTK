@@ -1,0 +1,634 @@
+#!/bin/tcsh
+#
+#set PY = "/global/project/projectdirs/m891/yiwang62/EV/bin/"
+set PY = "~/prj/EV/bin/"
+set www = "`pwd`"
+set h = $www:t
+unalias rm
+unalias cp
+unalias mv
+
+
+set dollar1 = '$1'
+set add = '>&'
+set add0 = '&'
+set q = '"'
+set pbsop = ""
+set INCAR = "../tplate/INCAR"
+set INCAR0 = "../tplate/INCAR"
+set lthr = 1000000
+set ethr = 100000
+set N_kpoint=10
+set K_TYPE="G"
+set nesting = ""
+set rerun = ""
+set Static = ""
+set nestfile = ""
+set ibrion = ""
+set lreal = ""
+set force = ""
+set forcerun = ""
+
+
+foreach o ( $* )
+  if (x$1 == "x-kpar") then
+    shift
+    set kpar = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-forcerun") then
+    set forcerun = "-forcerun"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-force") then
+    set force = "-force"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-nesting") then
+    set nesting = "-nesting"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-MAG2") then
+    set MAG2
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-LREAL") then
+    set lreal = "-LREAL"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-IBRION") then
+    shift
+    set ibrion = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-AAAA") then
+    shift
+    set AAAA = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-nestfile") then
+    shift
+    set nestfile = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-K_TYPE") then
+    shift
+    set K_TYPE = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-N_kpoint") then
+    shift
+    set N_kpoint = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-prec") then
+    shift
+    set prec = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-INCAR") then
+    shift
+    if ( -e "$1" ) then
+      set INCAR = "$1"
+      set INCAR0 = "$1"
+    else
+      echo "$1 : *********ERROR INCAR file not exist"
+      exit
+    endif
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-Static") then
+    set INCAR = "../tplate/INCAR.Static"
+    set Static = "-Static"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-lthr") then
+    shift
+    set lthr = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-ethr") then
+    shift
+    set ethr = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-IMIX") then
+    shift
+    set IMIX = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-IMIXM") then
+    shift
+    set IMIXM
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-rerun") then
+    set rerun = "-rerun"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else
+    set pbsop = "$pbsop $1"
+    if ( "$#argv" != 0 ) shift
+  endif
+end
+
+ARUN
+  set d = V"$ee"
+	cd $www/$d
+  if ( -e StaticConvergent ) then
+    set nk = `cat StaticConvergent | awk  '{print $2}'`
+    if ( "$nk" > 3000 ) continue
+  endif
+  if ( "$Static" != "" ) then
+    if ( -e StaticConvergent ) then
+      set INCAR = "../tplate/INCAR.Static"
+      set N_kpoint=16
+      set poscar = CONTCAR
+      goto step1
+    else if ( ! -e RelaxConvergent ) then
+      set INCAR = $INCAR0
+    else
+      if ( "$N_kpoint" == "G" ) goto vaspnesting
+      set nkR = `cat RelaxConvergent | awk  '{print $2}'`
+      if ( "$nkR" > 500 ) then
+        set INCAR = "../tplate/INCAR.Static"
+        set N_kpoint=16
+        set poscar = CONTCAR
+        goto step1
+      else
+        @ nx = "$nkR" * 3
+        set nkN = `ari -n -f %.0f $N_kpoint xx 3`
+        if ( "$nkN" < "$nx" ) goto vaspnesting
+        set INCAR = $INCAR0
+      endif
+    endif
+  else if ( ! -e RelaxConvergent ) then
+    set INCAR = $INCAR0
+  else
+    set poscar = CONTCAR
+    if ( "$N_kpoint" == "G" ) goto vaspnesting
+    set nkR = `cat RelaxConvergent | awk  '{print $2}'`
+    if ( "$nkR" > 500 ) then
+      continue
+    else
+      @ nx = "$nkR" * 3
+      set nkN = `ari -n -f %.0f $N_kpoint xx 3`
+      if ( "$nkN" < "$nx" ) goto vaspnesting
+      set INCAR = $INCAR0
+    endif
+  endif
+
+set poscar = ""
+if ( ! -e OSZICAR ) goto step1
+if ( ! -e CONTCAR ) goto step1
+if ( -z OSZICAR ) goto step1
+if ( -z CONTCAR ) goto step1
+set nl = `wc -l <CONTCAR`
+if ( "$nl" <= 9 ) goto step1
+
+set line = `grep "E0=" -a OSZICAR -n | tail -1`
+if ( "$line" == "" ) goto step1
+set ddE = `echo $line | awk '{print $9}' | sed "s/=//g"`
+set ldE = `ari -n -f %.0f $ddE x  $lthr | tr -d '-'`
+
+set n1 = `echo $line | sed 's/:/ /g' | awk '{print $1}'`
+set n2 = `wc -l <OSZICAR`
+set n3 = `grep "E0=" -a OSZICAR | wc -l`
+@ n11 = "$n1" - 1
+set line1 = "`head -$n11 OSZICAR | tail -1`"
+set ddE = `echo $line1 | awk '{print $4}' | sed 's/^-//g' | sed 's/E-/-/g' | sed 's/-/E-/g'`
+set edE = `ari -n -f %.0f $ddE x  $ethr | tr -d '-'`
+
+if ( "$ldE" != 0 ) then
+  if ( "$n3" != 1 ) goto step0
+  if ( "$n1" != "$n2" ) goto step0
+endif
+
+if ( "$edE" == 0 ) then
+  if ( ( "$rerun" == "" ) && ( "$Static" == "" ) ) continue
+  set poscar = CONTCAR
+  goto step1
+endif
+
+step0:
+
+if ( "$ldE" <= "$lthr" ) then
+  if ( "$edE" <= 10 ) then
+    set poscar = CONTCAR
+  endif
+endif
+
+step1:
+
+if ( "$poscar" == "" ) set poscar = "CONTCAR.savcon"
+if ( ! -e "$poscar" ) set poscar = "POSCAR"
+
+if ( -e INCAR_$NERSC_HOST ) then
+  rm INCAR_$NERSC_HOST
+endif
+
+if ( $?prec ) then
+  grep -v PREC  $INCAR >INCAR_$NERSC_HOST
+  echo "PREC= $prec">>INCAR_$NERSC_HOST
+else if ( -e INCAR_$NERSC_HOST ) then
+  rm INCAR_$NERSC_HOST
+endif
+if ( $?kpar ) then
+  if ( -e INCAR_$NERSC_HOST ) then
+    echo "KPAR= $kpar">>INCAR_$NERSC_HOST
+  else
+    cat $INCAR >INCAR_$NERSC_HOST
+    echo "KPAR= $kpar">>INCAR_$NERSC_HOST
+  endif 
+endif
+if ( $?IMIX ) then
+  if ( -e INCAR_$NERSC_HOST ) then
+    grep -v ISMEAR INCAR_$NERSC_HOST >t.m.p.file0
+    mv t.m.p.file0 INCAR_$NERSC_HOST
+    cat $IMIX >>INCAR_$NERSC_HOST
+  else
+    grep -v ISMEAR $INCAR >INCAR_$NERSC_HOST
+    cat $IMIX >>INCAR_$NERSC_HOST
+  endif 
+endif
+#echo $MAG2 >>& /dev/stderr
+if ( $?MAG2 ) then
+  if ( -e INCAR_$NERSC_HOST ) then
+    set nm = `grep MAGMOM INCAR_$NERSC_HOST | wc -l`
+    if ( "$nm" != 0 ) then
+      grep -v MAGMOM INCAR_$NERSC_HOST >t.m.p.file0
+      mv t.m.p.file0 INCAR_$NERSC_HOST
+      set nmn = `head -7 POSCAR | tail -2 | python $PY/mag.py -MAG2`
+      echo "$nmn" >>INCAR_$NERSC_HOST
+    endif
+  else
+    set nm = `grep MAGMOM $INCAR | wc -l`
+    if ( "$nm" != 0 ) then
+      grep -v MAGMOM $INCAR >INCAR_$NERSC_HOST
+      set nmn = `head -7 POSCAR | tail -2 | python $PY/mag.py -MAG2`
+      echo "$nmn" >>INCAR_$NERSC_HOST
+    endif
+  endif 
+endif
+
+if ( "$ibrion" != "" ) then
+  if ( -e INCAR_$NERSC_HOST ) then
+    grep -v IBRION INCAR_$NERSC_HOST >t.m.p.file0
+    mv t.m.p.file0 INCAR_$NERSC_HOST
+    echo "IBRION= $ibrion">>INCAR_$NERSC_HOST
+  else
+    grep -v IBRION $INCAR >INCAR_$NERSC_HOST
+    echo "IBRION= $ibrion">>INCAR_$NERSC_HOST
+  endif
+endif
+
+if ( "$lreal" != "" ) then
+  if ( -e INCAR_$NERSC_HOST ) then
+    grep -v LREAL INCAR_$NERSC_HOST >t.m.p.file0
+    mv t.m.p.file0 INCAR_$NERSC_HOST
+    echo "LREAL= Auto">>INCAR_$NERSC_HOST
+  else
+    grep -v LREAL $INCAR >INCAR_$NERSC_HOST
+    echo "LREAL= Auto">>INCAR_$NERSC_HOST
+  endif
+endif
+
+        set PRJ = ""
+        if ( $?WORKPRJ ) then
+          set PRJ = "$WORKPRJ"
+        endif
+        set RUNDIR =  $SCRATCH/`pwd | sed "s|$HOME/||g;s|$WORK/|$PRJ|g;s|/|_|g"`
+        if ( -e "$RUNDIR" ) then
+          set b = `grep "DUE TO TIME LIMIT" $RUNDIR/*.error | wc -l`
+          if ( "$b" == 0 ) then
+             set k1 = `grep "got SIGCONT" $RUNDIR/*.error | wc -l`
+             set k2 = `grep "CANCELLED AT" $RUNDIR/*.error | grep STEP | wc -l`
+             @ b = "$k1" * "$k2"
+             #if ( "$b" != 0) echo "found bigjob cancelled: `pwd`/$d"
+          endif
+          if ( "$b" != 0 ) then
+            #echo "found bigjob killed: `pwd`/$d"
+            echo "bigjob" >Bigjob
+          endif
+        endif
+
+set Conrec = ""
+if ( -e Convergence ) then
+  set conver = `grep "convergent ionic step" Convergence | tail -1`
+  set econver = `grep "convergent electronic step" Convergence | tail -1`
+  #if ( "$conver" == "not convergent electronic step" ) then
+  if ( "$econver" == "not convergent electronic step" ) then
+    set incar = $INCAR
+    if ( -e INCAR_$NERSC_HOST ) then
+      set incar = INCAR_$NERSC_HOST
+    endif
+
+    if ( -e RelaxConvergent ) then
+      grep -v ISMEAR $incar >INCAR.tmp
+      mv INCAR.tmp INCAR_$NERSC_HOST
+      echo "ISMEAR = -5" >>INCAR_$NERSC_HOST
+      set incar = INCAR_$NERSC_HOST
+    else
+      set ptry = `grep IMIX.0 Convergence | tail -1`
+      if ( "$ptry" == "" ) then
+        set Conrec = "IMIX.0"
+        grep -v ISMEAR $incar | grep -v SIGMA >INCAR.tmp
+        mv INCAR.tmp INCAR_$NERSC_HOST
+        cat ~/bin/hbin/IMIX.0 >>INCAR_$NERSC_HOST
+        goto endINCAR
+      endif
+    endif
+
+    set ptry = `grep IMIX.Ycell Convergence | tail -1`
+    if ( "$ptry" == "" ) then
+      set Conrec = "IMIX.Ycell"
+      if ( ! -e RelaxConvergent ) then
+        set poscarfile = "POSCAR"
+      else
+        set poscarfile = "CONTCAR"
+      endif
+      timeout 6 pos2s $poscarfile -THR 1.e-4 -sympos >&/dev/null
+      if ( "$status" != "124" ) then
+        if ( ! -e symmetry.pos ) then
+          echo "`pwd` symmetry.pos" >ERROR
+          exit
+        endif
+        Ycell -short <symmetry.pos >p.1
+        mv p.1 CONTCAR
+        rm symmetry.pos
+      else
+        if ( ! -e RelaxConvergent ) then
+          Ycell -short <POSCAR >p.1
+        else
+          Ycell -short <CONTCAR >p.1
+        endif
+        mv p.1 CONTCAR
+      endif
+      goto endINCAR
+    endif
+
+    set ptry = `grep IMIX.NORREAL Convergence | tail -1`
+    if ( "$ptry" == "" ) then
+      set Conrec = "IMIX.NONREAL"
+      grep -v MIX $incar | grep -v NELM | grep -v IALGO | grep -v LREAL | grep -v LPLANE | grep -v LSCALU | grep -v NSIM >INCAR.tmp
+      mv INCAR.tmp INCAR_$NERSC_HOST
+      goto endINCAR
+    endif
+
+    set ptry = `grep IMIX.MAG Convergence | tail -1`
+    if ( "$ptry" == "" ) then
+      set Conrec = "IMIX.MAG"
+      set AFM = `grep  MAGMOM $incar | grep '-' | wc -l`
+      if ( "$AFM" == "" ) then
+        grep -v MAGMOM $incar >INCAR.tmp
+        mv INCAR.tmp INCAR_$NERSC_HOST
+        goto endINCAR
+      endif
+    endif
+
+    set ptry = `grep IMIX.48 Convergence | tail -1`
+    if ( "$ptry" == "" ) then
+      set Conrec = "IMIX.48"
+      grep -v IALGO $incar >INCAR.tmp
+      mv INCAR.tmp INCAR_$NERSC_HOST
+      cat ~/bin/hbin/IMIX.48 >>INCAR_$NERSC_HOST
+      goto endINCAR
+    endif
+
+    set ptry = `grep IMIX.AMIX Convergence | tail -1`
+    if ( "$ptry" == "" ) then
+      set Conrec = "IMIX.AMIX"
+      grep -v MIX $incar | grep -v NELM | grep -v IALGO >INCAR.tmp
+      mv INCAR.tmp INCAR_$NERSC_HOST
+      cat ~/bin/hbin/IMIX.AMIX >>INCAR_$NERSC_HOST
+      echo "NELM = 200" >>INCAR_$NERSC_HOST
+      goto endINCAR
+    endif
+
+    echo "******** I made many tries for `pwd`, I still cannot make the electronic step convergent" >>& /dev/stderr
+
+endINCAR:
+
+  endif
+else if ( -e Bigjob ) then
+    echo "******** Bigjob  `pwd` requrie long CPU" >>& /dev/stderr
+endif
+
+set AAA = "A"
+if ( $?AAAA ) then
+  set AAA = "$AAAA"
+else
+  if ( "$NERSC_HOST" == "edison" ) then
+    set AAA = "E"
+  endif
+  if ( "$NERSC_HOST" == "cori" ) then
+    set AAA = "C"
+  endif
+endif
+
+  set nat = `head -7 $poscar | tail -1`
+  set nel = `zcat ../tplate/POTCAR.gz | grep "\.000000000000000" | grep -v E`
+  set ii = 0
+  set Var = 0.0
+  foreach na ( $nat )
+    set jj = 0
+    foreach ne ( $nel )
+      if ( "$ii" == "$jj" ) then
+        set Var = `ari -n $na x $ne + $Var`
+        break
+      endif
+      @ jj = "$jj" + 1
+    end
+    @ ii = "$ii" + 1
+  end
+  set NP = `ari -n -f %.0f $Var x 0.75`
+
+if ( ! $?vasppbsNrunned ) then
+  vasppbsN -NP $NP $pbsop | grep -v tmpdir >../j-head
+  set vasppbsNrunned
+endif
+cat ../j-head >"$AAA"-"$h"
+
+set WORKDIR = "`pwd`"
+
+set VSPCMD = '$VSPCMD'
+set error = 0
+set ferror =  $RUNDIR/"$AAA"-"$h".error
+if ( -e $ferror ) then
+  set error = `grep "VERY BAD NEWS" $ferror | wc -l`
+  if ( "$error" != 0 ) then
+    set errorVERYBADNEWS
+  else
+    set error = `grep "SYMPREC" $ferror | wc -l`
+    if ( "$error" != 0 ) then
+      set errorSYMPREC
+    endif
+  endif
+endif
+
+if ( -e ../tplate/KPOINTS.$N_kpoint ) then
+  cp ../tplate/KPOINTS.$N_kpoint .
+else
+  if ( "$N_kpoint" == "G" ) then
+cat <<end_end >>KPOINTS.G
+Zr 15x15x15
+ 0
+G
+1 1 1
+ 0 0 0
+end_end
+
+  else
+    vaspsetkpoints -N_kpoint $N_kpoint -K_TYPE $K_TYPE
+  endif
+endif
+
+if ( "$force" != "" ) then
+  if ( -e LOCKED ) then
+    rm LOCKED
+  endif
+endif
+
+cat <<end_end >>"$AAA"-"$h"
+
+cd $WORKDIR
+
+if ( "$force" == "" ) then
+  set nested = \`vaspnest 7200\`
+  if ( "\$nested" == 0 ) goto vaspnesting
+endif
+
+if ( -e LOCKED ) then
+    @ dt = \`stat -c %Y LOCKED\` - \`date +%s\`
+    if ( "\$dt" < -172800 ) then
+      touch LOCKED
+      set lockedbyme
+    else
+      goto vaspnesting
+    endif
+else
+      touch LOCKED
+      set lockedbyme
+      if ( "\$status" != 0 ) goto vaspnesting
+endif
+
+if ( "$forcerun" == "" ) then
+if ( -e OSZICAR ) then
+if ( ! -z OSZICAR ) then
+  set com = \`vasparunconvergence\`
+  if ( "\$com" == "0" ) then
+    goto vaspnesting
+  else if ( "\$com" == "10" ) then
+    if ( "$Static" == "" ) goto vaspnesting
+  else if ( "\$com" == "11" ) then
+    if ( "$rerun" == "" ) goto vaspnesting
+  endif
+endif
+endif
+endif
+
+if ( !(-e $RUNDIR) ) then
+  mkdir $RUNDIR
+  if ( "\$status" != 0 ) goto vaspnesting
+else
+  if ( "$force" == "" ) then
+    if ( -e $RUNDIR/INCAR ) then
+      @ dt = \`stat -c %Y $RUNDIR/INCAR\` - \`date +%s\`
+      if ( "\$status" != 0 ) goto vaspnesting
+      if ( -e $RUNDIR/OUTCAR  ) then
+        @ dt = \`stat -c %Y $RUNDIR/OUTCAR\` - \`date +%s\`
+        if ( "\$status" != 0 ) goto vaspnesting
+        if ( "\$dt" > -3600 ) then
+          goto vaspnesting
+        endif
+      else
+        if ( "\$dt" > -86400 ) goto vaspnesting
+      endif
+    endif
+  endif
+  \rm -r $RUNDIR
+  if ( "\$status" != 0 ) goto vaspnesting
+  mkdir $RUNDIR
+  if ( "\$status" != 0 ) goto vaspnesting
+endif
+
+unalias cp
+unalias mv
+
+if ( "$Conrec" != "" ) then
+  echo "$Conrec" >>Convergence
+endif
+
+if ( -e KPOINTS.$N_kpoint ) then
+  cp -f KPOINTS.$N_kpoint $RUNDIR/KPOINTS
+else
+  cp -f ../tplate/KPOINTS  $RUNDIR/.
+endif
+
+if ( -e INCAR_$NERSC_HOST ) then
+  cp -f INCAR_$NERSC_HOST    $RUNDIR/INCAR
+else if ( -e $INCAR ) then
+  cp -f $INCAR    $RUNDIR/INCAR
+else
+  cp -f ../tplate/INCAR    $RUNDIR/.
+endif
+
+if ( $?errorVERYBADNEWS ) then
+  echo "SYMPREC = 1.e-12" >>$RUNDIR/INCAR
+else if ( $?errorSYMPREC ) then
+  echo "SYMPREC = 1.e-12" >>$RUNDIR/INCAR
+endif
+
+#cp -f POTCAR   $RUNDIR
+
+if ( -e ../tplate/POTCAR ) then
+  cp -f ../tplate/POTCAR   $RUNDIR/.
+else if ( -e ../tplate/POTCAR.gz ) then
+  zcat ../tplate/POTCAR.gz   >$RUNDIR/POTCAR
+else if ( -e ../../POTCAR.gz ) then
+  zcat ../../POTCAR.gz   >$RUNDIR/POTCAR
+endif
+
+if ( "$nesting" != "" ) then
+  echo > nested_run
+endif
+
+cp $poscar $RUNDIR/POSCAR
+
+cd $RUNDIR
+
+$VSPCMD $add $RUNDIR/"$AAA"-"$h".error
+vaspcopyconvergence -workdir $www/$d
+
+cd $WORKDIR
+if ( -e OUTCAR ) gzip -f OUTCAR
+if ( -e OUTCAR ) gzip -f DOSCAR
+
+if ( -e nested_run ) then
+  rm nested_run
+endif
+
+vaspnesting:
+
+if ( \$?lockedbyme ) then
+  rm LOCKED
+endif
+
+end_end
+
+        chmod u+x "$AAA"-"$h"
+
+if ( "$nesting" != "" ) then
+  if ( -e $nestfile ) then
+      set bfile = `cat $nestfile | sed "s/cd //g;s/; /\//g"`
+      echo "cd `pwd`; "$AAA"-$h" >> $bfile
+  endif
+  echo "cd `pwd`; "$AAA"-$h" > $nestfile
+endif
+
+echo "cd `pwd`; "$AAA"-$h"
+        cd ..
+        endif
+        endif
+end
+

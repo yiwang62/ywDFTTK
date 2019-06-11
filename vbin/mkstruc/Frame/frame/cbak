@@ -1,0 +1,33 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+
+unalias cp
+
+foreach ee ( 0.955 0.970 0.985 1.000 1.015 1.030 1.045 )
+    set d = V"$ee"
+
+       set hd = $h"$d"
+
+        cd $d
+
+set PRJ = ""
+if ( $?WORKPRJ ) then
+  set PRJ = "$WORKPRJ"
+endif
+set tmpdir =  $SCRATCH/`pwd | sed "s|$HOME/||g;s|$WORK/|$PRJ|g;s|/|_|g"`
+
+          set cfile = "$tmpdir/CONTCAR"
+          set ofile = "$tmpdir/OSZICAR"
+          set tfile = "$tmpdir/OUTCAR"
+          if ( -e $cfile ) then
+            if ( ! -z $cfile ) then
+              cp $cfile .
+              cp $ofile .
+              cp $tfile .
+            endif
+          endif
+        cd ..
+end
+

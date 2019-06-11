@@ -1,0 +1,31 @@
+#!/bin/csh -f
+#
+
+set ppx = "`pwd`"
+set hhx = $ppx:t
+set pp = $ppx/E/E$hhx
+
+if ( ! ( -e $pp ) ) mkdir $pp
+cp E/str.out $pp/str.out
+cp E/str.out $pp/str_relax.out
+
+cd E
+jrun2 $*
+cd ..
+
+mcmd
+
+foreach ee ( STRAIN_LIST )
+foreach hh ( STRAIN_TYPE )
+    set d = X"$hh""$ee"
+
+	if ( -e $d ) then
+        cd $d
+jrun2 $*
+        cd ..
+	else
+	    echo "********ERROR: WORKDIR is not created yet"
+	    exit;
+	endif
+end
+end

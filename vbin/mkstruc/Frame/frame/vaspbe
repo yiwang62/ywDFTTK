@@ -1,0 +1,18 @@
+#!/bin/csh -f
+#
+
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+unalias cp
+unalias mv
+unalias rm
+
+foreach  dd ( `ls  -F  ../V*/CONTCAR` )
+        set x = $dd:h
+        set d = $x:t
+        if ( ! -e $d ) mkdir $d
+        Ycell -ss 1 <$dd >$d/POSCAR
+end
+

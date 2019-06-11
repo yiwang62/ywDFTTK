@@ -1,0 +1,61 @@
+#!/bin/tcsh
+
+unalias cp
+unalias mv
+unalias rm
+
+set dir = "*/tplate/"
+#set dir = "Fe/tplate/"
+set www = `pwd`
+
+foreach d ( $dir )
+  set line = `head -6 $d/POSCAR | tail -1`
+  set nomag = 1
+  foreach el ( $line )
+    if ( "$el" == "Ni" ) set nomag = 0
+    if ( "$el" == "Cr" ) set nomag = 0
+    if ( "$el" == "Fe" ) set nomag = 0
+    if ( "$el" == "Mn" ) set nomag = 0
+    if ( "$el" == "Co" ) set nomag = 0
+    if ( "$el" == "Eu" ) set nomag = 0
+    if ( "$el" == "V" ) set nomag = 0
+  end
+
+  set demag = 1
+  if ( "$nomag" == 0 ) then
+    if ( -e $d/../drun ) then
+      set line = `grep "foreach ee" $d/../drun | sed "s/foreach ee (//g;s/)//g"`
+      foreach vol ( $line )
+        set f = $d/../V$vol/OSZICAR
+        if ( -e $f ) then
+          set nf = "`grep E0 $f | tail -1 | awk '{print NF}'`"
+          if ( "$nf" == 10 ) then
+            set mag = "`grep E0 $f | tail -1 | awk '{print $10}'`"
+            set imag = `ari -n -f %.0f $mag x 1000`
+            if ( "$imag" == "0" ) then
+              set line = "`grep MAGMOM $d/INCAR.Relax`"
+              if ( "$line != "" ) set demag = `echo $line | grep -v "-" | wc -l | awk '{print $1)'`
+            else if ( "$imag" == "-0" ) then
+              set line = "`grep MAGMOM $d/INCAR.Relax`"
+              if ( "$line != "" ) set demag = `echo $line | grep -v "-" | wc -l | awk '{print $1)'`
+            else
+              set demag = 0
+            endif
+
+          endif
+        endif
+      end
+    else
+      set demag = 0
+    endif
+  endif
+
+  endif
+
+  if ( "$demag" == 1 ) then
+    echo $d/../ demag = $demag
+    grep -v ISPIN $d/INCAR.Relax | grep -v MAGMOM >t.0; mv t.0 $d/INCAR.Relax; cp $d/INCAR.Relax $d/INCAR
+    grep -v ISPIN $d/INCAR.Static | grep -v MAGMOM >t.0; mv t.0 $d/INCAR.Static
+    grep -v ISPIN $d/INCAR.PH | grep -v MAGMOM >t.0; mv t.0 $d/INCAR.PH
+  endif
+end

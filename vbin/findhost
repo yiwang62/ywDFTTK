@@ -1,0 +1,61 @@
+#!/bin/bash
+
+YHOST="bridges"
+whost=`echo $HOST | grep $YHOST | wc -l`
+if [ "$whost" == 1 ]; then
+  echo $YHOST
+  exit
+fi
+
+YHOST="stampede2"
+whost=`echo $HOST | grep $YHOST | wc -l`
+if [ "$whost" == 1 ]; then
+  echo $YHOST
+  exit
+fi
+
+YHOST="comet"
+whost=`echo $HOST | grep $YHOST | wc -l`
+if [ "$whost" == 1 ]; then
+  echo $YHOST
+  exit
+fi
+
+YHOST="edison"
+whost=`echo $HOST | grep $YHOST | wc -l`
+if [ "$whost" == 1 ]; then
+  echo $YHOST
+  exit
+fi
+
+YHOST="cori"
+whost=`echo $HOST | grep $YHOST | wc -l`
+if [ "$whost" == 1 ]; then
+  echo $YHOST
+  exit
+fi
+
+YHOST="aci"
+whost=`echo $HOST | grep $YHOST | wc -l`
+if [ "$whost" == 1 ]; then
+  echo $YHOST
+  exit
+fi
+
+YHOST="lonestar"
+whost=`echo $HOST | grep $YHOST | wc -l`
+if [ "$whost" == 1 ]; then
+  echo $YHOST
+  exit
+fi
+
+YHOST="bridges"
+whost=`echo $HOST | grep $YHOST | wc -l`
+if [ "$whost" == 1 ]; then
+  echo $YHOST
+  exit
+fi
+
+YHOST="unknown"
+echo $YHOST
+

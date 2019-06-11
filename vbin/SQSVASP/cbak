@@ -1,0 +1,24 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+
+foreach ee ( STR* )
+    set d = "$ee"
+
+       set hd = $h"$d"
+
+        cd $d
+set hhhh = $HOME"/"
+set pwdc = `pwd`
+set tpwd = `echo $pwdc | sed "s|$hhhh||g;s|/|_|g"`
+set tmpdir = "/scratch/`whoami`/$tpwd"
+	  set cfile = "$tmpdir/CONTCAR"
+	  set ofile = "$tmpdir/OSZICAR"
+	  if ( -e $cfile ) then
+            cp $cfile .
+            cp $ofile .
+	  endif
+        cd ..
+end
+

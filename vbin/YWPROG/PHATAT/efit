@@ -1,0 +1,75 @@
+#!/bin/csh -f
+#
+
+set s = "`pwd`"
+set h = $s:t
+set x = $s:h
+set d = $x:t
+
+set indir = $h$d
+
+set FUNC = "SGTE"
+set xRange = "300:1600"
+set xL = 300
+set xR = 1600
+
+foreach option ( $* )
+  if (x$1 == "x-h") then
+    echo "USAGE: efit -p indir"
+    exit
+  else if (x$1 == "x-xRange") then
+    shift
+    set xRange = $1
+    shift
+    continue
+  else if (x$1 == "x-fF") then
+    shift
+    set FUNC = "$1"
+    shift
+    continue
+  else if (x$1 == "x-xAuto") then
+    shift
+    set x_Auto
+  else if (x$1 == "x-xL") then
+    shift
+    set xL = $1
+    shift
+    continue
+  else if (x$1 == "x-xR") then
+    shift
+    set xR = $1
+    shift
+    continue
+  else if (x$1 == "x-p") then
+    shift
+    set indir = $1
+    shift
+    continue
+  else if (x$1 != "x") then
+    set OFILE = "$1"
+    if ( $#argv != 0 ) shift
+  endif
+end
+
+unalias cp
+unalias rm
+
+set pwd = `pwd`
+set DATADIR = "$pwd/$indir"
+set Dt = $DATADIR:t
+set Dh = $DATADIR:h
+set WORKDIR = "$Dh/thermo-$Dt"
+set file = $WORKDIR/vdos_e
+
+YWfit -xRange $xL $xR -col 1 3 -eVtoJ -$FUNC <$file | grep "param\[" >tmpfile.$$
+set x_MIN = `grep -v '#' $file | awk '{print $1}' | sort -n -k 1 | head -1`
+set x_MAX = `grep -v '#' $file | awk '{print $1}' | sort -n -k 1 | tail -1`
+#if ($?x_Auto) set xRange = "$x_MIN"':'"$x_MAX"
+if ($?x_Auto) set xRange = "200"':'"$x_MAX"
+
+wc -l tmpfile.$$ | awk '{nn = $1; file = $2; a=97} {for (i=1; i<=nn; i++) {getline <file; printf "%c = %s\n", a++, $3}} {for (; a<=122; ) {printf "%c = 0.0\n", a++}}' >efit.plt
+sed "s|x_RANGE|$xRange|g;s|x_FILE|$file|g" </global/homes/y/yiwang62/bin/YWPROG/PHATAT/EFIT.plt >>efit.plt
+#gnuplot -persist -pointsize 2 efit.plt &
+xterm -e "gnuplot -pointsize 2 efit.plt" &
+
+rm tmpfile.$$

@@ -1,0 +1,46 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+set wt = "$1"
+set wd = ':00'
+
+foreach ee ( STR* )
+    set d = "$ee"
+
+        set hd = $h"$d"
+        set nd = `echo $hd | sed "s|00000||g"`
+
+        cd $d
+
+set hhhh = $HOME"/"
+set pwdc = `pwd`
+set tpwd = `echo $pwdc | sed "s|$hhhh||g;s|/|_|g"`
+set tmpdir = "/scratch/`whoami`/$tpwd"
+
+if ( !(-e $tmpdir) ) mkdir $tmpdir
+setenv RUNDIR $tmpdir
+set WORKDIR = "`pwd`"
+
+cat <<! >B-"$hd"
+#\!/bin/csh -f
+#PBS -N $nd
+#PBS -q QUEUE
+#PBS -l NODES
+#PBS -l walltime=$wt$wd
+cd $WORKDIR
+\cp    KPOINTS  $RUNDIR
+\cp    POTCAR   $RUNDIR
+\cp    INCAR    $RUNDIR
+\cp    CONTCAR  $RUNDIR/POSCAR
+cd   $RUNDIR
+VSPCMD
+\cp  OSZICAR $WORKDIR/.
+\cp  CONTCAR $WORKDIR/.
+\cp  OUTCAR $WORKDIR/.
+!
+
+	qsub B-"$hd"
+        cd ..
+end
+

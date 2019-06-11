@@ -1,0 +1,7 @@
+#!/bin/tcsh -f
+#
+
+head -1 $1 | awk '{printf "%7s %8s %9s %7s %7s %5s %7s %9s %5s %7s %5s\n", $2,$3,$5,$7,$8,$9,$10,$11,$13,$15,$17}' >tmp.file
+cat $1 | grep -v "#" | awk '{printf "%7.1f %8.4f %9.4f %7.2f %7.2f %7.2f %7.2f %9.4f %5.0f %7.1f %5.2f\n", $1,$2,$4,$6,$7,$8,$9,$10,$12,$14,$16}' >>tmp.file
+vi tmp.file
+\rm tmp.file

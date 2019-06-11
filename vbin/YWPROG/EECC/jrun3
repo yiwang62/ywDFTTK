@@ -1,0 +1,6 @@
+#!/bin/csh -f
+#
+
+cd E
+jrun3 $*
+cd ..

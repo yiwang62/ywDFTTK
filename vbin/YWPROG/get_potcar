@@ -1,0 +1,42 @@
+#!/bin/csh
+
+set POTPATH="/usr/global/msc/vasp/pot_GGA/elements/"
+
+
+set xlist =""
+foreach option ( $* )
+  if (x$1 == "x-GGA") then
+    	shift
+	set POTPATH="/usr/global/msc/vasp/pot_GGA/elements/"
+  else if (x$1 == "x-LDA") then
+    	shift
+	set POTPATH="/usr/global/msc/vasp/pot_LDA/elements/"
+  else if (x$1 == "x-GGA_PAW") then
+    	shift
+#	set POTPATH="/usr/global/msc/vasp/potpaw_GGA/"
+	set POTPATH="/home4/yuw3/VASP/PAW_new/PAW_GGA/"
+  else if (x$1 == "x-LDA_PAW") then
+    	shift
+#	set POTPATH="/usr/global/msc/vasp/potpaw_LDA/"
+	set POTPATH="/home4/yuw3/VASP/PAW_new/PAW_LDA/"
+  else if (x$1 == "x-GGA_PAW_PBE") then
+    	shift
+	set POTPATH="/usr/global/msc/vasp/potpaw_PBE/"
+  else
+    set xlist = `echo "$xlist $1"` 
+    if ( $#argv != 0 ) shift
+  endif
+end
+
+echo -n  >! POTCAR
+foreach element ( $xlist )
+  if ( -e $POTPATH/$element/POTCAR ) then
+    cat $POTPATH/$element/POTCAR >>! POTCAR
+  else
+    zcat $POTPATH/$element/POTCAR.Z >>! POTCAR
+  endif
+  if ( $status == 1 ) then
+    echo Cannot read $POTPATH/$element/POTCAR\*
+    exit 1
+  endif
+end

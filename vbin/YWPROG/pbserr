@@ -1,0 +1,22 @@
+#!/bin/csh
+
+set file = "$1".o"$2"
+if (-e $file) then
+  foreach errmsg ( "rrrr" "cnorm" "failed" "fetal" "Terminated" )
+    grep -i -q $errmsg $file
+    if ( $status == 0 ) then
+      echo "job is in error"
+    endif
+  end
+endif
+
+set file = "$1".e"$2"
+if (-e $file) then
+  foreach errmsg ( "Error" "killed" )
+    grep -i -q $errmsg $file
+    if ( $status == 0 ) then
+      echo "job killed due to time limit"
+    endif
+  end
+endif
+

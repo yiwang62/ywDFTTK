@@ -1,0 +1,15 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+
+foreach ee ( STR* )
+
+    set d = "$ee"
+
+        cd $d
+          cp OSZICAR "$1".OSZ
+          cp CONTCAR "$1".CON
+        cd ..
+end
+

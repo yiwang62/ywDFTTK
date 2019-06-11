@@ -1,0 +1,9 @@
+#
+set ib = $1
+set ie = $2
+set i = $ib
+while ( $i <= $ie )
+  scancel "$i"
+  echo scancel "$i"
+  @ i = "$i" + 1
+end

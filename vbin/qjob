@@ -1,0 +1,24 @@
+#!/bin/tcsh
+#
+
+set job = "$1"
+set StdOut = `scontrol show job $job | grep StdOut= | sed "s/StdOut=//g;s/ //g"`
+
+if ( "$StdOut" != "" ) then
+  set fjob = `ls $StdOut | & tail -1 | awk '{print $1}'`
+  if ( -e "$fjob" ) then
+    set cmd = "`grep 'cd ' $fjob | tail -1`"
+    set cmd0 = `echo $cmd | awk '{print $2}' | sed "s/;//"`
+    echo $cmd0
+  else
+    set Command = `scontrol show job $job | grep Command= | sed "s/Command=//g;s/ //g"`
+    set No = `echo $Command:t | sed "s/-/ /g" | awk '{print $NF}'`
+    @ No = "$No" + 1
+    set dir = $Command:h
+    set cmd = `sed -n "$No p" $dir"/jobfile"`
+    set cmd0 = `echo $cmd | awk '{print $2}' | sed "s/;//"`
+    echo $cmd0
+  endif
+endif
+
+

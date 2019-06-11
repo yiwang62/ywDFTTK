@@ -1,0 +1,54 @@
+#!/bin/csh -f
+#
+set ppx = "`pwd`"
+set hhx = $ppx:t
+set pp = $ppx/E/E$hhx
+
+unalias cp
+unalias mv
+
+foreach dir ( E/*/vol* )
+
+if ( -e $dir ) then
+
+set dirE = $ppx/$dir
+set vdir = $dirE:t
+
+foreach ee ( STRAIN_LIST )
+foreach hh ( STRAIN_TYPE )
+
+    set d = X"$hh""$ee"
+    if ( ! -d $d ) mkdir $d
+
+        cd $d
+
+    if ( -e ../KPOINTS ) cp ../KPOINTS .
+    Phatat _PHLIST
+    grep -v -i fitfc jrun2 >t.m.p.file
+    mv t.m.p.file jrun2
+    chmod u+x jrun2
+
+    set d0 = $d$hhx
+    if ( ! -d $d0 ) mkdir $d0
+    /global/homes/y/yiwang62/bin/YWPROG/EECC/strain $hh $ee <$pp/str.out >$d0/str.out
+    /global/homes/y/yiwang62/bin/YWPROG/EECC/strain $hh $ee <$pp/str_relax.out >$d0/str_relax.out
+
+    set d1 = $ppx/$d/$d$hhx/$vdir
+    if ( ! -d $d1 ) mkdir $d1
+
+    /global/homes/y/yiwang62/bin/YWPROG/EECC/strain $hh $ee <$dirE/str.out >$d1/str_ref.out
+    if ( -e $dirE/str_relax.out ) then
+        /global/homes/y/yiwang62/bin/YWPROG/EECC/strain $hh $ee <$dirE/str_relax.out >$d1/str.out
+    else
+        /global/homes/y/yiwang62/bin/YWPROG/EECC/strain $hh $ee <$dirE/str.out >$d1/str.out
+    endif
+    touch $d1/wait
+
+       	cd $ppx
+
+end
+end
+
+endif
+
+end

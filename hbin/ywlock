@@ -1,0 +1,43 @@
+#!/bin/bash
+# exclusive_lock.sh
+PRJ=""
+if [ $?WORKPRJ ]; then
+  PRJ=$WORKPRJ
+fi
+lockfile=$SCRATCH/`pwd | sed "s|$HOME/||g;s|$WORK/|$PRJ|g;s|/|_|g"`
+jobfile="$1" 
+jobToRun="$1"".run" 
+nn=`wc -l <$jobfile`
+
+while [ 1==1 ]
+do
+  exec 200>$lockfile
+  if [ "$status"==0 ]; then
+    break
+  fi
+done
+
+while [ 1==1 ]
+do
+  flock -x 200
+  if [ "$status"==0 ]; then
+    break
+  fi
+done
+
+   if [ -f $jobToRun ] ; then
+     n=`tail -1 $jobToRun | awk '{print $1}'`
+   else
+     n=0
+   fi
+   if [ $n -lt $nn ]; then
+     #rec=`head -$n $jobfile | tail -1`
+     #((n=n+1))
+     let "n++"
+     rec=`sed -n "$n p" $jobfile`
+     echo $n `hostname` : $rec `date`>>$jobToRun
+     echo $rec `date`
+   else
+     echo "alljobdone"
+   fi
+   sleep 1s

@@ -1,0 +1,98 @@
+#!/bin/tcsh
+#
+set s = "`pwd`"
+set h = $s:t
+unalias mv
+unalias rm
+unalias cp
+set www = `pwd`
+set hh = $www:t
+
+set dir = */
+set sqsdir = ""
+
+unalias cp
+unalias mv
+unalias rm
+set www = `pwd`
+set e55 = "e55.dat"
+set sqsdir = ""
+set hT = 900
+set hCp = 99
+
+foreach option ( $* )
+  if (x$1 == "x-dir") then
+    if ( $#argv != 0 ) shift
+    set dir = "$1"
+  else if (x$1 == "x-data") then
+    if ( "$#argv" != 0 ) shift
+    set data = "$1"
+  else if (x$1 == "x-ht") then
+    if ( "$#argv" != 0 ) shift
+    set ht = "$1"
+  else if (x$1 == "x-hCp") then
+    if ( "$#argv" != 0 ) shift
+    set hCp = "$1"
+  else if (x$1 == "x-sqs") then
+    if ( "$#argv" != 0 ) shift
+    set sqsdir = "$1"
+  else if (x$1 == "x-SQS") then
+    set SQS
+  endif
+  if ( $#argv != 0 ) shift
+end
+
+#vaspcon "$dir" >QQ0.dat
+#../IN718/runcheck
+#vaspchk >t0.dat
+
+#cp x00.dat e55.dat
+#set hT = 153
+set iTHz = 100
+
+set pall = `sort -k1 $e55 | awk '{print $1"#__#"$9"#__#"$8}'`
+set iii = 0
+set jjj = 0
+set kkk = 0
+set lll = 0
+set ooo = 0
+set ppp = 0
+set qqq = 0
+set sss = 0
+foreach ff ( $pall )
+  @ iii = "$iii" + 1
+  set dd = `echo $ff | sed "s/#__#/ /g" | awk '{print $1}'` 
+  if ( -e $dd/thermo/vdos_e ) then
+    set nl = `wc -l <$dd/thermo/vdos_e`
+    if ( "$nl" > 20 ) then
+      @ sss = "$sss" + 1
+    endif
+  endif
+  if ( ! -e $dd/used22.dat ) then
+    echo "******** skipped doubtful results for $hh/$dd, used22.dat not found" >>& /dev/stderr
+    @ kkk = "$kkk" + 1
+    continue
+  endif
+  if ( ! -e $dd/good22.dat ) then
+    echo "******** skipped doubtful results for $hh/$dd, good22.dat not found" >>& /dev/stderr
+    @ kkk = "$kkk" + 1
+    continue
+  endif
+  set nl = "`wc -l <$dd/good22.dat`"
+  if ( "$nl" < "5" ) then
+    echo "******** skipped doubtful results for $hh/$dd, good22.dat no enough data $nl" >>& /dev/stderr
+    @ kkk = "$kkk" + 1
+    continue
+  endif
+  #continue
+
+  set energy = `echo $ff | sed "s/#__#/ /g" | awk '{print $2}'` 
+  set pfile = "$dd/tplate/POSCAR"
+
+        set atom = `head -6 $pfile | tail -1`
+        set line = `head -7 $pfile | tail -1`
+ 
+        set nc = `echo $line | wc -w`
+        echo $atom $line $dd $energy
+        @ jjj = "$jjj" + 1
+end

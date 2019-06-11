@@ -1,0 +1,206 @@
+#!/bin/tcsh
+#
+if ( ! -e good22.dat ) exit
+set nl = `wc -l <good22.dat`
+if ( "$nl" < 5 ) exit
+
+unalias rm
+set ecldatabase = "~/bin/hbin/eclIN718.dat"
+
+set ooo = "-oszicar OSZICAR -contcar CONTCAR -doscar DOSCAR"
+set s = "`pwd`"
+set h = $s:t
+set pbsop = "-W 00:29 -node 1 -Q shared"
+set nq = ""
+set debcut = "-DebCut 0.3"
+set Pr = ""
+set T1 = "-T1 2000"
+set thermo = "thermo"
+set izero = ""
+set thr2 = "-thr2 0.001"
+set func = ""
+foreach option ( $* )
+  if ( "x$1" == "x-W" ) then
+    shift;set pbsop = "$pbsop -W $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( "$1" == "-izero" ) then
+    shift; set izero = "-izero $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( "$1" == "-thermo" ) then
+    shift; set thermo = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( "$1" == "-Morse" ) then
+    set func = "-fitFunc -Morse"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( "$1" == "-trun" ) then
+    set trun
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( "$1" == "-rerun" ) then
+    set rerun
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( "$1" == "-T1" ) then
+    shift; set T1 = "-T1 $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( "$1" == "-Pr" ) then
+    shift; set Pr = "-Pr $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( "$1" == "-DebCut" ) then
+    shift; set debcut = "-DebCut $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( "$1" == "-nq" ) then
+    set nq = "-nq"
+    shift; set nq = "$nq $1"
+    shift; set nq = "$nq $1"
+    shift; set nq = "$nq $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-debug") then
+    set debug
+    if ( "$#argv" != 0 ) shift
+    continue
+  else
+    set pbsop = "$pbsop $1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  endif
+end
+
+set ee = ""
+set qq = '"'
+set DDIR = ""
+set eeee = `awk '{print $3}' good22.dat`
+set ee = "-ee $qq$eeee$qq"
+foreach eee ( $eeee )
+  set DDIR = "$DDIR V$eee"
+end
+
+if ( -e $thermo/vdos ) then
+  if ( -z $thermo/vdos ) then
+    echo "zero `pwd`/$thermo/vdos"
+    rm -r $thermo
+  endif
+endif
+
+if ( $?rerun ) then
+  echo "`pwd`/thermo : rerun"
+  goto rerun
+endif
+
+set i = 0
+if ( -e $thermo/vdos ) then
+      set nl = `wc -l <$thermo/vdos`
+      if ( "$nl" > 11 ) then
+         set t0 = `stat -c %Y $thermo/vdos`
+         set t1 = `stat -c %Y good22.dat`
+         @ dif =  "$t1" - "$t0"
+         if ( "$dif" > 1 ) then
+            echo "`pwd`/thermo : updating calculation with new good22.dat"
+            set runthermo
+         endif
+
+         foreach v ( $DDIR )
+           set vvv = $v/vdos.out
+           if ( -e $vvv ) then
+             if ( ! -e $v/CONTCAR ) exit
+             if ( -z $v/CONTCAR ) exit
+  	     set nl = `wc -l <$v/CONTCAR`
+	     if ( "$nl" < 9 ) exit
+
+             if ( ! -e $v/DOSCAR ) exit
+             if ( -z $v/DOSCAR ) exit
+             set nl = `wc -l <$v/DOSCAR`
+             if ( "$nl" < 101 ) exit
+
+             set nl = `wc -l <$vvv`
+             if ( "$nl" < 101 ) then
+               rm $v/vdos.out
+               exit
+             endif
+             set t1 = `stat -c %Y $vvv`
+             @ dif =  "$t1" - "$t0"
+             if ( "$dif" > 1 ) then
+               echo "`pwd`/thermo : updating calculation with new vdos.out in $v"
+               set runthermo
+             endif
+
+             if ( ! -e $v/OSZICAR ) exit
+             if ( -z $v/OSZICAR ) exit
+             set t1 = `stat -c %Y $v/OSZICAR`
+             @ dif =  "$t1" - "$t0"
+             if ( "$dif" > 1 ) then
+               echo "`pwd`/thermo : updating calculation with new OSZICAR in $v"
+               set runthermo
+             endif
+
+             @ i = "$i" + 1
+
+           endif
+         end
+      else
+        goto rerun
+      endif
+else
+  goto rerun
+endif
+
+if ( $?runthermo ) goto thermorun
+exit
+
+rerun:
+
+set i = 0
+foreach d ( $DDIR )
+    if ( -e $d/vdos.out ) then
+      if ( ! -e $d/OSZICAR ) exit
+      if ( -z $d/OSZICAR ) exit
+      if ( ! -e $d/CONTCAR ) exit
+      if ( -z $d/CONTCAR ) exit
+      set nl = `wc -l <$d/CONTCAR`
+      if ( "$nl" < 9 ) then
+        exit
+      endif
+      set nl = `wc -l <$d/vdos.out`
+      if ( "$nl" < 101 ) then
+        rm $d/vdos.out
+        exit
+      endif
+      if ( ! -e $d/DOSCAR ) exit
+      if ( -z $d/DOSCAR ) exit
+      set nl = `wc -l <$d/DOSCAR`
+      if ( "$nl" < 101 ) then
+        exit
+      endif
+      @ i = "$i" + 1
+    endif
+end
+
+
+thermorun:
+
+if ( "$i" < 5 ) exit
+
+set bjob = `pwd`/B-"$h"
+vasppbs $pbsop >$bjob
+set WORKDIR = "`pwd`"
+echo "cd $WORKDIR" >>$bjob
+echo "Ythermo -e $func -fitF $ooo $T1 -thermo $thermo $Pr $izero $ee" >>$bjob
+echo "cd $www" >>$bjob
+echo "touch touched" >>$bjob
+
+if ( $?trun ) then
+  chmod u+x $bjob
+  $bjob
+else
+  echo -n "`pwd`/thermo : "
+  sbatch $bjob
+endif
+

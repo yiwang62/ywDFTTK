@@ -1,0 +1,94 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+
+set add = '>&'
+set q = '"'
+set pbsop = ""
+set Ochk = ""
+set clean = "clean"
+set save = "full"
+unalias mv
+unalias cp
+unalias rm
+
+foreach o ( $* )
+  if ( "$o" == "-ochk" ) then
+    set Ochk = "check"
+  else if ( "$o" == "-noclean" ) then
+    set clean = "noclean"
+  else if ( "$o" == "-brief" ) then
+    set save = "brief"
+  else
+    set pbsop = "$pbsop $o"
+  endif
+end
+
+foreach ee ( 0.955 0.970 0.985 1.000 1.015 1.030 1.045 )
+    set d = V"$ee"
+
+        if ( -e $d ) then
+        if ( "$Ochk" != "check" || ! ( -e $d/OSZICAR ) || -z $d/OSZICAR ) then
+        cd $d
+
+vasppbs $pbsop >B-"$h"
+set WORKDIR = "`pwd`"
+set RUNDIR = '$tmpdir'
+set VSPCMD = '$VSPCMD'
+
+cat <<end.end >>B-"$h"
+if ( !(-e $RUNDIR) ) mkdir $RUNDIR
+cd $WORKDIR
+unalias cp
+unalias mv
+cp -f ../tplate/KPOINTS  $RUNDIR
+zcat ../tplate/POTCAR.gz   >$RUNDIR/POTCAR
+
+cp -f ../tplate/INCAR.pbe    $RUNDIR/INCAR
+cp -f CONTCAR   $RUNDIR/POSCAR
+cd $RUNDIR
+
+$VSPCMD $add $RUNDIR/PBE-"$h".error
+
+cp -f OSZICAR $WORKDIR/HSE.OSZ
+cp -f CONTCAR $WORKDIR/HSE.CON
+cp -f DOSCAR $WORKDIR/HSE.DOS
+cp -f OUTCAR $WORKDIR/HSE.OUT
+
+cp $RUNDIR/PBE-"$h".error $WORKDIR
+
+cp -f $WORKDIR/../tplate/INCAR.hse    INCAR
+
+$VSPCMD $add $RUNDIR/HSE-"$h".error
+
+cp -f OSZICAR $WORKDIR/HSE.OSZ
+cp -f CONTCAR $WORKDIR/HSE.CON
+cp -f DOSCAR $WORKDIR/HSE.DOS
+cp -f OUTCAR $WORKDIR/HSE.OUT
+
+cp $RUNDIR/HSE-"$h".error $WORKDIR
+
+cp -f $WORKDIR/../tplate/INCAR.dos    INCAR
+
+$VSPCMD $add $RUNDIR/DOS-"$h".error
+
+cp -f OSZICAR $WORKDIR/DOS.OSZ
+cp -f CONTCAR $WORKDIR/DOS.CON
+cp -f DOSCAR $WORKDIR/DOS.DOS
+cp -f OUTCAR $WORKDIR/DOS.OUT
+
+cp $RUNDIR/DOS-"$h".error $WORKDIR
+
+cd $WORKDIR
+
+gzip HSE.OUT
+
+end.end
+
+        sbatch B-"$h"
+        cd ..
+        endif
+        endif
+end
+

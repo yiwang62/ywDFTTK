@@ -1,0 +1,403 @@
+#!/bin/tcsh -f
+#
+set BIN=/global/homes/y/yiwang62/bin/YWPROG
+set PHATAT=$BIN/PHATAT
+
+unalias cp
+unalias mv
+unalias rm
+
+set ATOM = ""
+
+set KPOINTS = 0
+set _PREC = High
+set _KPPRA = 2000
+set _KPFORCE = 0
+set _ISPIN = 1
+set LWAVE = '.TRUE.'
+set ENCUT = "Default"
+set NRELAX = 3
+set SYMPREC = "Default"
+set R_SMEAR=1
+set _ER = 10.5
+set _NS = 9
+set _MS = 0.16
+set _FR = 5.2
+set _DR = 0.2
+set NRR = 0
+set SHIFTV0 = 0
+set ISIF_1 = "fullrelax"
+set ISIF_2 = "ion_shape"
+set DFILE = dfile.fcc
+set DOPOT = "DOGGA"
+set nostr = 0
+
+if (  -e ~/.eecc_resource ) then
+
+   set machine = `hostname`
+   cat ~/.eecc_resource | awk -F\\n "/$machine/,/\/$machine/" | grep -v "$machine" | grep -v "\$machine" >t.m.p.file
+
+   set string = "GGA"
+   set $string =  "`grep \:$string\: t.m.p.file | sed 's|\:$string\:||g'`"
+   set string = "LDA"
+   set $string =  "`grep \:$string\: t.m.p.file | sed 's|\:$string\:||g'`"
+   set string = "GGA_PAW"
+   set $string =  "`grep \:$string\: t.m.p.file | sed 's|\:$string\:||g'`"
+   set string = "LDA_PAW"
+   set $string =  "`grep \:$string\: t.m.p.file | sed 's|\:$string\:||g'`"
+   set string = "GGA_PAW_PBE"
+   set $string =  "`grep \:$string\: t.m.p.file | sed 's|\:$string\:||g'`"
+
+else
+
+set GGA="/usr/global/msc/vasp/pot_GGA/elements/"
+set LDA="/usr/global/msc/vasp/pot_LDA/elements/"
+set GGA_PAW="/usr/global/msc/vasp/potpaw_GGA/"
+set LDA_PAW="/usr/global/msc/vasp/potpaw_LDA/"
+set GGA_PAW_PBE="/usr/global/msc/vasp/potpaw_PBE/"
+
+endif
+
+set POT = GGA_PAW_PBE
+set SUBATOM = ""
+set MAGATOM = ""
+
+foreach option ( $* )
+  if (x$1 == "x-h") then
+    echo "USAGE: Phatat   [-pr prec]"
+    echo "                [-kp kppra]"
+    echo "                [-ispin ISPIN]"
+    echo "                [-LWAVE]"
+    echo "                [-ENCUT encut]"
+    echo "                [-er ER]"
+    echo "                [-rs ISMEAR]"
+    echo "                [-nrr]"
+    echo "                [-KPOINTS]"
+    echo "                [-ns NS]"
+    echo "                [-ms MS]"
+    echo "                [-fr FR]"
+    echo "                [-dr DR]"
+    echo "                [-df DFILE]"
+    echo "                [-ISIF1 ISF1]"
+    echo "                [-ISIF2 ISF2]"
+    echo "                [-shiftv0]"
+    echo "                [-POT pot]"
+    echo "                [-SUBATOM seds]"
+    exit
+  else if (x$1 == "x-pr") then
+    shift
+    set _PREC="$1"
+    shift
+    continue
+  else if (x$1 == "x-nrr") then
+    shift
+    set NRR = 1
+    continue
+  else if (x$1 == "x-shiftv0") then
+    shift
+    set SHIFTV0 = 1
+    continue
+  else if (x$1 == "x-KPOINTS") then
+    shift
+    set KPOINTS = 1
+    continue
+  else if (x$1 == "x-nostr") then
+    shift
+    set nostr = 1
+    continue
+  else if (x$1 == "x-atom") then
+    shift
+#    set ATOM = `echo "$1" |  sed "s/,/ /g"`
+    set ATOM = "$1"
+    shift
+    continue
+  else if (x$1 == "x-kp") then
+    shift
+    set _KPPRA="$1"
+    shift
+    continue
+  else if (x$1 == "x-kpf") then
+    shift
+    set _KPFORCE="$1"
+    shift
+    continue
+  else if (x$1 == "x-ispin") then
+    shift
+    set _ISPIN="$1"
+    shift
+    continue
+  else if (x$1 == "x-LWAVE") then
+    shift
+    set LWAVE='.FALSE.'
+  else if (x$1 == "x-ENCUT") then
+    shift
+    set ENCUT="$1"
+    shift
+    continue
+  else if (x$1 == "x-NRELAX") then
+    shift
+    set NRELAX="$1"
+    shift
+    continue
+  else if (x$1 == "x-SYMPREC") then
+    shift
+    set SYMPREC="$1"
+    shift
+    continue
+  else if (x$1 == "x-rs") then
+    shift
+    set R_SMEAR = "$1"
+    shift
+    continue
+  else if (x$1 == "x-er") then
+    shift
+    set _ER="$1"
+    shift
+    continue
+  else if (x$1 == "x-ns") then
+    shift
+    set _NS="$1"
+    shift
+    continue
+  else if (x$1 == "x-ms") then
+    shift
+    set _MS="$1"
+    shift
+    continue
+  else if (x$1 == "x-fr") then
+    shift
+    set _FR="$1"
+    shift
+    continue
+  else if (x$1 == "x-dr") then
+    shift
+    set _DR="$1"
+    shift
+    continue
+  else if (x$1 == "x-ISIF1") then
+    shift
+    set ISIF_1="$1"
+    shift
+    continue
+  else if (x$1 == "x-ISIF2") then
+    shift
+    set ISIF_2="$1"
+    shift
+    continue
+  else if (x$1 == "x-df") then
+    shift
+    set DFILE="$1"
+    shift
+    continue
+  else if (x$1 == "x-POT") then
+    shift
+    set POT = "$1"
+    shift
+    continue
+  else if (x$1 == "x-extrafile") then
+    shift
+    set extrafile = "$1"
+    shift
+    continue
+  else if (x$1 == "x-SUBATOM") then
+    shift
+    set q = '"'
+#    set SUBATOM = "$q$1$q"
+    set SUBATOM = "$1"
+    shift
+    continue
+  else if (x$1 == "x-MAGATOM") then
+    shift
+    set MAGATOM = "$1"
+    shift
+    continue
+  else if ($#argv == "0") then
+    break
+  else
+    echo "********ERROR: Unknown option $1"
+    shift
+    if ($#argv != "0") continue
+  endif
+end
+
+if ( $nostr == 0 ) then
+
+if ( -e str.out ) then
+  if ( -z str.out ) then
+    echo "********ERROR: str.out has no data"
+    exit;
+  endif
+else if ( -e POSCAR ) then
+  if ( -z POSCAR ) then
+    echo "********ERROR: POSCAR has no data"
+    exit;
+  endif
+  poscar2str <POSCAR -atom $ATOM >str.out
+else if ( -e POSCAR.cif ) then
+  if ( -z POSCAR.cif ) then
+    echo "********ERROR: POSCAR.cif has no data"
+    exit;
+  endif
+  w2vasp <POSCAR.cif >POSCAR
+  poscar2str <POSCAR -atom $ATOM >str.out
+else
+    echo "********ERROR: CANNOT find any of str.out, POSCAR, or POSCAR.cif"
+    exit;
+endif
+
+endif
+
+if ( $POT == "GGA" ) then
+  set POT = $GGA
+  set DOPOT = "DOGGA"
+else if ( $POT == "LDA" ) then
+  set POT = $LDA
+  set DOPOT = "DOLDA"
+else if ( $POT == "GGA_PAW" ) then
+  set POT = $GGA_PAW
+  set DOPOT = "DOGGA"
+else if ( $POT == "LDA_PAW" ) then
+  set POT = $LDA_PAW
+  set DOPOT = "DOLDA"
+else if ( $POT == "GGA_PAW_PBE" ) then
+  set POT = $GGA_PAW_PBE
+  set DOPOT = "DOGGA"
+else
+  echo "********ERROR: wrong potential assignment"
+  exit
+endif
+
+if ( "$KPOINTS" == "0" ) then
+
+sed "s|DOGGA|$DOPOT|g;s|R_SMEAR|$R_SMEAR|g;s|_PREC|$_PREC|g;s|_KPPRA|$_KPPRA|g;s|_ISPIN|$_ISPIN|g;s|_LWAVE|$LWAVE|g" <$PHATAT/vasp.wrap1 >vasp.wrap1
+sed "s|DOGGA|$DOPOT|g;s|R_SMEAR|$R_SMEAR|g;s|_PREC|$_PREC|g;s|_KPPRA|$_KPPRA|g;s|_ISPIN|$_ISPIN|g;s|_LWAVE|$LWAVE|g" <$PHATAT/vasp.wrap2 >vasp.wrap2
+
+else
+
+sed "s|DOGGA|$DOPOT|g;s|R_SMEAR|$R_SMEAR|g;s|_PREC|$_PREC|g;s|_KPPRA|$_KPPRA|g;s|_ISPIN|$_ISPIN|g;s|_LWAVE|$LWAVE|g" <$PHATAT/vasp.wrap1 | grep -v -i kppra >vasp.wrap1
+sed "s|DOGGA|$DOPOT|g;s|R_SMEAR|$R_SMEAR|g;s|_PREC|$_PREC|g;s|_KPPRA|$_KPPRA|g;s|_ISPIN|$_ISPIN|g;s|_LWAVE|$LWAVE|g" <$PHATAT/vasp.wrap2 | grep -v -i kppra >vasp.wrap2
+
+endif
+
+if ( "$_KPFORCE" == "0" ) set _KPFORCE = $_KPPRA
+
+sed "s|DOGGA|$DOPOT|g;s|R_SMEAR|$R_SMEAR|g;s|_PREC|$_PREC|g;s|_KPPRA|$_KPFORCE|g;s|_ISPIN|$_ISPIN|g" <$PHATAT/vasp.wrap3 >vasp.wrap3
+
+  if ( "$ISIF_1" == "norelax" ) then
+    echo "NSW=0" >>vasp.wrap1
+    echo "ISIF = 0" >>vasp.wrap2
+  else
+    echo "NSW=45" >>vasp.wrap1
+  endif
+
+  if ( "$ISIF_1" == "fullrelax" ) then
+    echo "ISIF = 3" >>vasp.wrap1
+  else if ( "$ISIF_1" == "iononly" ) then
+    echo "ISIF = 2" >>vasp.wrap1
+  else if ( "$ISIF_1" == "shapeonly" ) then
+    echo "ISIF = 5" >>vasp.wrap1
+  else if ( "$ISIF_1" == "volumeonly" ) then
+    echo "ISIF = 7" >>vasp.wrap1
+  else if ( "$ISIF_1" == "ion_shape" ) then
+    echo "ISIF = 4" >>vasp.wrap1
+  else if ( "$ISIF_1" == "volume_shape" ) then
+    echo "ISIF = 6" >>vasp.wrap1
+  endif
+
+  if ( "$ISIF_2" == "norelax" ) then
+    echo "NSW=0" >>vasp.wrap2
+    echo "ISIF = 0" >>vasp.wrap2
+  else
+    echo "NSW=45" >>vasp.wrap2
+  endif
+
+  if ( "$ISIF_2" == "fullrelax" ) then
+    echo "ISIF = 3" >>vasp.wrap2
+  else if ( "$ISIF_2" == "iononly" ) then
+    echo "ISIF = 2" >>vasp.wrap2
+  else if ( "$ISIF_2" == "shapeonly" ) then
+    echo "ISIF = 5" >>vasp.wrap2
+  else if ( "$ISIF_2" == "volumeonly" ) then
+    echo "ISIF = 7" >>vasp.wrap2
+  else if ( "$ISIF_2" == "ion_shape" ) then
+    echo "ISIF = 4" >>vasp.wrap2
+  else if ( "$ISIF_2" == "volume_shape" ) then
+    echo "ISIF = 6" >>vasp.wrap2
+  endif
+
+  echo "NSW=0" >>vasp.wrap3
+  echo "ISIF = 3" >>vasp.wrap3
+
+if ($SUBATOM != "") echo "SUBATOM=$SUBATOM" >>vasp.wrap1
+if ($SUBATOM != "") echo "SUBATOM=$SUBATOM" >>vasp.wrap2
+if ($SUBATOM != "") echo "SUBATOM=$SUBATOM" >>vasp.wrap3
+if ($MAGATOM != "") echo "MAGATOM=$MAGATOM" >>vasp.wrap1
+if ($MAGATOM != "") echo "MAGATOM=$MAGATOM" >>vasp.wrap2
+if ($MAGATOM != "") echo "MAGATOM=$MAGATOM" >>vasp.wrap3
+if ($ENCUT != "Default") echo "ENCUT=$ENCUT" >>vasp.wrap1
+if ($ENCUT != "Default") echo "ENCUT=$ENCUT" >>vasp.wrap2
+if ($ENCUT != "Default") echo "ENCUT=$ENCUT" >>vasp.wrap3
+if ($SYMPREC != "Default") echo "SYMPREC=$SYMPREC" >>vasp.wrap1
+if ($SYMPREC != "Default") echo "SYMPREC=$SYMPREC" >>vasp.wrap2
+if ($SYMPREC != "Default") echo "SYMPREC=$SYMPREC" >>vasp.wrap3
+
+if ($?extrafile) then
+  if ( "$extrafile" != "" ) then
+    if ( -e $extrafile ) then
+      cat "$extrafile" >>vasp.wrap1
+      cat "$extrafile" >>vasp.wrap2
+      cat "$extrafile" >>vasp.wrap3
+    endif
+  endif
+endif
+
+if ( "$KPOINTS" != "0" ) then
+  echo "[KPOINT]" >>vasp.wrap1
+  echo "[KPOINT]" >>vasp.wrap2
+  cat KPOINTS >>vasp.wrap1
+  cat KPOINTS >>vasp.wrap2
+endif
+
+if ( "$NRR" == "1") then
+  set FITFC = "fitfc -sig=10 -er=$_ER -dr=$_DR -ns=1 -nrr"
+else
+  set FITFC = "fitfc -sig=10 -er=$_ER -ns=$_NS -ms=$_MS -dr=$_DR"
+endif
+
+
+if ( "$SHIFTV0" == "1") then
+  if (  "$NRR" == "1" || "$_NS" == "1" ) then
+    set VSHIFT = ""
+  else
+    set n1 = `ari -n $_NS - 1`
+    set vpara = `ari -n $_MS / $n1`
+    set VSHIFT = "str_transform $vpara"
+  endif
+else
+  set VSHIFT = ""
+endif
+
+sed "s|_NRELAX|$NRELAX|g;s|_VSHIFT|$VSHIFT|g;s|_POTGGA|$POT|g;s|_POTLDA|$POT|g" <$PHATAT/jrun1 >jrun1
+chmod u+x jrun1
+
+sed "s|FITFC|$FITFC|g;s|_POTGGA|$POT|g;s|_POTLDA|$POT|g" <$PHATAT/jrun2 >jrun2
+chmod u+x jrun2
+
+sed "s|FITFC|$FITFC|g;s|_POTGGA|$POT|g;s|_POTLDA|$POT|g" <$PHATAT/jrun3 >jrun3
+chmod u+x jrun3
+
+sed "s|FITFC|$FITFC|g;s|_FR|$_FR|g" <$PHATAT/vvib >vvib
+chmod u+x vvib
+
+sed "s|FITFC|$FITFC|g;s|_FR|$_FR|g" <$PHATAT/dvib >dvib
+chmod u+x dvib
+
+sed "s|FITFC|$FITFC|g;s|_FR|$_FR|g" <$PHATAT/jrun_dvib >jrun_dvib
+chmod u+x jrun_dvib
+
+set plist0 = "ecmd efit"
+foreach i ( $plist0 )
+  cp -f $PHATAT/$i .
+end
+
+cp -f $PHATAT/$DFILE DFILE

@@ -1,0 +1,67 @@
+#!/bin/bash
+# exclusive_lock.sh
+if [ ! -d $SCRATCH/ywlock ]; then
+  while [ 1==1 ]
+  do
+    mkdir $SCRATCH/ywlock
+    if [ "$status"==0 ]; then
+      break
+    fi
+  done
+fi
+lockfile=$SCRATCH/ywlock/`pwd | sed "s|/|_|g"`
+
+jobfile="$1" 
+jobToRun="$1"".run" 
+nn=`wc -l <$jobfile`
+
+nx=0
+while [ 1==1 ]
+do
+  exec 200>$lockfile
+  if [ "$status"==0 ]; then
+    break
+  fi
+  let "nx++"
+  sleep 1s
+  if [ "$nx" -gt 99 ]; then
+    echo "alljobdone"
+    exit
+  fi
+done
+
+nx=0
+while [ 1==1 ]
+do
+  flock -x 200
+  if [ "$status"==0 ]; then
+    break
+  fi
+  let "nx++"
+  sleep 1s
+  if [ "$nx" -gt 99 ]; then
+    echo "alljobdone"
+    exit
+  fi
+done
+
+   if [ -f $jobToRun ] ; then
+     n=`tail -1 $jobToRun | awk '{print $1}'`
+     re='^[0-9]+$'
+     if ! [[ $n =~ $re ]] ; then
+       n=`wc -l <$jobToRun`
+     fi
+   else
+     n=0
+   fi
+   if [ $n -lt $nn ]; then
+     #rec=`head -$n $jobfile | tail -1`
+     #((n=n+1))
+     let "n++"
+     rec=`sed -n "$n p" $jobfile`
+     echo $n `hostname` : $rec `date`>>$jobToRun
+     echo $rec `date`
+   else
+     echo "alljobdone"
+   fi
+   sleep 1s

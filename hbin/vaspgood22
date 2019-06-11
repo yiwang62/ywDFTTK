@@ -1,0 +1,154 @@
+#!/bin/tcsh
+#
+set s = "`pwd`"
+set h = $s:t
+unalias mv
+unalias rm
+set www = `pwd`
+
+set ethr = 10000
+
+
+set dir = */
+#set dir = Al/
+#set dir = "Mn-mp-35-AFM4/"
+foreach d ( $dir )
+  if ( ! -e $www/$d/tplate ) continue
+  if ( ! -e $www/$d/used22.dat ) then
+    if ( -e $www/$d/good22.dat ) rm $www/$d/good22.dat
+    continue
+  endif
+
+  if ( -e $www/$d/good22.dat ) then
+    if ( "`stat -c %Y $www/$d/good22.dat`" >= "`stat -c %Y $www/$d/used22.dat`" ) continue
+  endif
+
+  if ( -e $www/$d/good22.dat ) then
+    set nl = `wc -l < $www/$d/good22.dat`
+    if ( "$nl" >= 7 ) then
+       #echo " good22 found for $d nl=$nl"
+       continue
+    else if ( "$nl" == 0 ) then
+      rm $www/$d/good22.dat
+    endif
+  endif
+
+  echo -n > $www/$d/tmp22.dat
+  cd $www/$d
+    set ii = 0
+    foreach ee ( `awk '{print $3}' used22.dat` )
+      @ ii = "$ii" + 1
+      set dd = "V$ee"
+      cd $www/$d/$dd
+
+set oszicar = "Static.OSZ"
+set contcar = "Static.CON"
+set outcar = "Static.OUT.gz"
+
+if ( ! -e $outcar ) then
+  set outcar = "OUTCAR.gz"
+endif
+
+if ( ! -e $outcar ) then
+  set outcar = "OUTCAR"
+endif
+
+if ( ! -e $oszicar ) then
+  set oszicar = "OSZICAR"
+endif
+
+if ( ! -e $contcar ) then
+  set contcar = "CONTCAR"
+endif
+
+
+if ( ! -e $oszicar ) goto out0
+if ( ! -e $contcar ) goto out0
+if ( -z $oszicar ) goto out0
+if ( -z $contcar ) goto out0
+set nl = `wc -l <$contcar`
+if ( "$nl" <= 9 ) goto out0
+
+set line = `grep "E0=" -a $oszicar -n | tail -1`
+if ( "$line" == "" ) goto out0
+
+set n1 = `echo $line | sed 's/:/ /g' | awk '{print $1}'`
+set n3 = `grep "E0=" -a $oszicar | wc -l`
+if ( "$n3" != 1 ) goto out0
+set n2 = `wc -l <$oszicar`
+if ( "$n1" != "$n2" ) goto out0
+
+@ n1 = "$n1" - 1
+set line1 = "`head -$n1 $oszicar | tail -1`"
+set ddE = `echo $line1 | awk '{print $4}'`
+set dE = `ari -n -f %.0f $ddE x  $ethr | tr -d '-'`
+
+
+if ( "$dE" != 0 ) then
+  goto out0
+endif
+
+if ( ! -e $outcar ) goto out0
+if ( -z $outcar ) goto out0
+
+
+set zipped = `file $outcar | grep "gzip compressed data"`
+
+if ( "$zipped" != "" ) then
+  set enmax = `zcat $outcar | grep ENMAX | tr -d ';' | sort -k3 -n | tail -1 | awk '{print $3}' | sort -n | tail -1`
+  set encut = `zcat $outcar | grep ENCUT | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+  set ismear = `zcat $outcar | grep SMEAR | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+else
+  if ( $?goutcar ) then
+    set enmax = `grep ENMAX $goutcar | tr -d ';' | sort -k3 -n | tail -1 | awk '{print $3}' | sort -n | tail -1`
+    set encut = `grep ENCUT $goutcar | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+    set ismear = `grep SMEAR $goutcar | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+    unset goutcar
+  else
+    set enmax = `grep ENMAX $outcar | tr -d ';' | sort -k3 -n | tail -1 | awk '{print $3}' | sort -n | tail -1`
+    set encut = `grep ENCUT $outcar | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+    set ismear = `grep SMEAR $outcar | tr -d ';' | awk '{print $3}' | sort -n | tail -1`
+  endif
+endif
+
+if ( "$enmax" == "" || "$ismear" == "" || "$encut" == "" ) then
+  rm $outcar
+  rm $oszicar
+  goto out0
+endif
+
+#echo ENCUT= $encut, `pwd`/$outcar
+if ( -e ../tplate/INCAR.Static ) then
+  set en0 = `grep ENCUT ../tplate/INCAR.Static | sed "s/ENCUT//;s/=//"`
+  set high = `ari -n -f %.0f $encut - $en0 / $enmax x 100 +25.01`
+else
+  set high = `ari -n -f %.0f $encut - $enmax / $enmax x 100`
+endif
+
+if ( ("$high" >= "25") && ("$ismear" == "-5") ) then
+  head -$ii $www/$d/used22.dat | tail -1 >> $www/$d/tmp22.dat
+  echo "StaticConvergent 4000 $NERSC_HOST" > StaticConvergent
+  #echo "`pwd` : StaticConvergent 4000 $NERSC_HOST"
+else
+  echo "RelaxConvergent 1000 $NERSC_HOST" > RelaxConvergent
+endif
+
+out0:
+    end
+
+    set nl = `wc -l < $www/$d/tmp22.dat`
+    if ( "$nl" >= 5 ) then
+      if ( -e $www/$d/good22.dat ) then
+        set dif = "`diff $www/$d/tmp22.dat $www/$d/good22.dat`"
+        if ( "$dif" != "" ) then
+          mv $www/$d/tmp22.dat $www/$d/good22.dat
+          echo " updated good22.dat for $www/$d "
+        endif
+      else
+          mv $www/$d/tmp22.dat $www/$d/good22.dat
+          echo " new good22.dat for $www/$d "
+      endif
+    endif
+    if ( -e $www/$d/tmp22.dat ) rm $www/$d/tmp22.dat
+
+end

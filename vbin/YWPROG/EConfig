@@ -1,0 +1,208 @@
+#!/bin/tcsh -f
+#
+set BIN=/global/homes/y/yiwang62/bin/YWPROG
+set EECC=$BIN/EECC
+
+unalias cp
+unalias mv
+unalias rm
+
+set ATOM = ""
+
+set CUB="e1 e456"
+set HEX="e1 e3 e45"
+set TET="e1 e36 e45"
+set ORT="e1 e2 e3 e456"
+set MON="e1 e2 e3 e4 e56"
+set TRI="e1 e2 e3 e4 e5 e6"
+
+set STRAIN_TYPE="$CUB"
+set lattice=cub
+
+set elist = "0.01"
+set phlist = ""
+set nn = 0
+set np = 0
+set ISIF1 = fullrelax
+set ISIF2 = ion_shape
+
+foreach option ( $* )
+  if (x$1 == "x-h") then
+    echo "USAGE: THconfig [-pr prec]"
+    echo "                [-kp kppra]"
+    echo "                [-ispin ISPIN]"
+    echo "                [-ENCUT encut]"
+    echo "                [-LWAVE]"
+    echo "                [-er ER]"
+    echo "                [-nrr]"
+    echo "                [-ns NS]"
+    echo "                [-ms MS]"
+    echo "                [-fr FR]"
+    echo "                [-dr DR]"
+    echo "                [-df DFILE]"
+    echo "                [-rs ISMEAR]"
+    echo "                [-ISIF1 ISF1]"
+    echo "                [-ISIF2 ISF2]"
+    echo "                [-SUBATOM seds]"
+    echo "                [-POT pot]"
+    echo "                [-l lattice_type]"
+    echo "                [strain1 strain2] ... " 
+    echo "                [-ee strain1 strain2] ... " 
+    echo "                [-atom atom_list]"
+    exit
+  else if (x$1 == "x-pr" \
+	|| x$1 == "x-kp" \
+	|| x$1 == "x-kpf" \
+	|| x$1 == "x-ispin" \
+	|| x$1 == "x-ENCUT" \
+	|| x$1 == "x-NRELAX" \
+	|| x$1 == "x-er" \
+	|| x$1 == "x-ns" \
+	|| x$1 == "x-ms" \
+	|| x$1 == "x-fr" \
+	|| x$1 == "x-dr" \
+	|| x$1 == "x-df" \
+	|| x$1 == "x-rs" \
+	|| x$1 == "x-MAGATOM" \
+	|| x$1 == "x-POT" \
+			) then
+    set phlist = "$phlist $1"
+    shift
+    set phlist = "$phlist $1"
+    shift
+    continue
+  else if ( x$1 == "x-extrafile" ) then
+    set phlist = "$phlist $1"
+    shift
+    set phlist = "$phlist ../$1"
+    shift
+    continue
+  else if ( x$1 == "x-ISIF1" ) then
+    shift
+    set ISIF1 = $1
+    shift
+    continue
+  else if ( x$1 == "x-ISIF2" ) then
+    shift
+    set ISIF2 = $1
+    shift
+    continue
+  else if ( x$1 == "x-SUBATOM" ) then
+    set q = '"'
+    set phlist = "$phlist $1"
+    shift
+
+#    set phlist = "$phlist $q$1$q"
+    set phlist = "$phlist $1"
+    shift
+    continue
+  else if (x$1 == "x-nrr" \
+	|| x$1 == "x-KPOINTS" \
+	|| x$1 == "x-LWAVE" \
+	|| x$1 == "x-shiftv0" \
+			) then
+    set phlist = "$phlist $1"
+    shift
+    continue
+  else if (x$1 == "x-atom") then
+    shift
+#    set ATOM = `echo "$1" |  sed "s/,/ /g"`
+    set ATOM = "$1"
+    shift
+    continue
+  else if (x$1 == "x-l") then
+    shift
+    set lattice=$1
+    shift
+    continue
+  else if (x$1 == "x-ee") then
+    shift
+    if ( "$nn" == 0 ) then
+      set elist = "$1"
+    else
+      set elist = "$elist $1"
+    endif
+    @ nn = "$nn" + 1
+    shift
+    continue
+  else if ( "$#argv" != 0 ) then
+    if ( "$nn" == 0 ) then
+      set elist = "$1"
+    else
+      set elist = "$elist $1"
+    endif
+    @ nn = "$nn" + 1
+    shift
+  else if ($#argv == "0") then
+    break
+  else
+    echo "********ERROR: Unknown option $1"
+    shift
+    if ($#argv != "0") continue
+  endif
+end
+
+if ( -e POSCAR ) then
+  if ( -z POSCAR ) then
+    echo "********ERROR: POSCAR has no data"
+    exit;
+  endif
+  poscar2str <POSCAR -atom $ATOM >str.out
+else if ( -e str.out ) then
+  if ( -z str.out ) then
+    echo "********ERROR: str.out has no data"
+    exit;
+  endif
+else if ( -e POSCAR.cif ) then
+  if ( -z POSCAR.cif ) then
+    echo "********ERROR: POSCAR.cif has no data"
+    exit;
+  endif
+  w2vasp <POSCAR.cif >POSCAR
+  poscar2str <POSCAR -atom $ATOM >str.out
+else
+    echo "********ERROR: CANNOT find any of str.out, POSCAR, or POSCAR.cif"
+    exit;
+endif
+
+if ( "$lattice" == "cub" ) then
+  set STRAIN_TYPE="$CUB"
+else if ( "$lattice" == "hex" ) then
+  set STRAIN_TYPE="$HEX"
+else if ( "$lattice" == "tet" ) then
+  set STRAIN_TYPE="$TET"
+else if ( "$lattice" == "ort" ) then
+  set STRAIN_TYPE="$ORT"
+else if ( "$lattice" == "mon" ) then
+  set STRAIN_TYPE="$MON"
+else if ( "$lattice" == "tri" ) then
+  set STRAIN_TYPE="$TRI"
+endif
+
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/jrun1E >jrun1E; chmod u+x jrun1E
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/jrun2E >jrun2E; chmod u+x jrun2E
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/jrun2X >jrun2X; chmod u+x jrun2X
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/jrun2 >jrun2; chmod u+x jrun2
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/jrun3 >jrun3; chmod u+x jrun3
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/jrun3T >jrun3T; chmod u+x jrun3T
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/dvib >dvib; chmod u+x dvib
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/dvibT >dvibT; chmod u+x dvibT
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/jrun_dvib >jrun_dvib; chmod u+x jrun_dvib
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/jrun_dvibT >jrun_dvibT; chmod u+x jrun_dvibT
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g" <$EECC/dthm >dthm; chmod u+x dthm
+
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g;s|_LATTICE|$lattice|g" <$EECC/ssnn >ssnn
+chmod u+x ssnn
+
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g;s|_LATTICE|$lattice|g" <$EECC/magm >magm
+chmod u+x magm
+
+set rx = "-nostr -ISIF1 iononly -ISIF2 iononly $phlist"
+sed "s|STRAIN_LIST|$elist|g;s|STRAIN_TYPE|$STRAIN_TYPE|g;s|_PHLIST|$rx|g" \
+	<$EECC/mcmd >mcmd
+chmod u+x mcmd
+
+if ( ! ( -e E ) ) mkdir E
+cp str.out E
+if ( -e KPOINTS ) cp KPOINTS E/
+cd E; Phatat -ISIF1 $ISIF1 -ISIF2 $ISIF2 $phlist; cd ..

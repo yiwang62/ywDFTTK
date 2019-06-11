@@ -1,0 +1,23 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+set x = $s:h
+set d = $x:t
+
+if ( ! (-e pos) ) mkdir pos
+foreach dir ( $d$h/vol_* )
+    set pfile = $dir/POSCAR.static
+    set efile = $dir/OSZICAR.static
+    if ( -e $efile && ! (-z $efile) ) then
+        set p0 = `head -2 $pfile | tail -1 | awk '{print $1}' `
+        set p1 = `head -3 $pfile | tail -1 | awk '{print $1}' `
+        set vol = `ari -n 0.-$p1 x $p0 x 2.0 xx 3 / 4 `
+        set x = `ari -n -f %9.6f $vol xx .33333333333/.529177`
+        set e = `grep "E0=" $efile | tail -1 | awk '{print $5}'`
+        set y = `ari -n $e / 13.6058 - 2`
+	set str = $dir:t
+        printf "%12.12s :" "$str"
+        poscnv $x <$dir/vdos.out >pos/$x.pos
+    endif
+end

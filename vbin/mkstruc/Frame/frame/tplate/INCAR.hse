@@ -1,0 +1,17 @@
+System = phonon of Zr bcc - omiga
+
+NWRITE = 0
+
+#LWAVE=.F.
+
+PREC = A
+ISMEAR = 0; SIGMA=0.01
+NSW=0
+#LCALCEPS=.TRUE.
+#LRPA=.TRUE.
+ISIF = 0
+ LHFCALC = .TRUE. ; HFSCREEN = 0.2
+ NBANDS = 16
+ ALGO = All ; TIME = 0.4
+ PRECFOCK=A
+

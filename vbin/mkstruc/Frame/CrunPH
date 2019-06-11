@@ -1,0 +1,59 @@
+#!/bin/csh
+#
+set s = "`pwd`"
+set h = $s:t
+
+set PY = "PYPATH"
+
+set pbsop = ""
+set node = 96
+
+set Crun = "jrun"
+
+foreach o ( $* )
+  if ( "$1" == "-node" ) then
+    if ( "$#argv" != 0 ) shift
+    set node = "$1"
+    shift
+    continue
+  else if ( "$1" == "-Crun" ) then
+    set Crun = "Crun"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else
+    set pbsop = "$pbsop $1"
+    if ( "$#argv" != 0 ) shift
+  endif
+end
+
+set s = `pwd`
+foreach d ( */phonon/` )
+   cd  $d
+      cd tplate
+        set eled = `head -6 POSCAR | tail -1`
+        set eledN = `head -7 POSCAR | tail -1`
+        echo $eledN >NELECTRONS
+        python $PY/getNEls.py $eled
+      cd ..
+
+      set newnode = `python $PY/getNode.py`
+      if ( "$newnode" < "1" ) set newnode = 1
+      if ( "$newnode" <= "16" ) then
+	if ("$NERSC_HOST" == "cori" ) then
+          $Crun -node $newnode -Q shared $pbsop
+	else
+          $Crun -node $newnode $pbsop
+	endif
+      else if ( "$newnode" < "$node" ) then
+        $Crun -node $newnode $pbsop
+      else if ( "$node" <= "16" ) then
+	if ("$NERSC_HOST" == "cori" ) then
+          $Crun -node $node -Q shared $pbsop
+	else
+          $Crun -node $node $pbsop
+	endif
+      else
+        $Crun -node $node $pbsop
+      endif
+   cd $s
+end

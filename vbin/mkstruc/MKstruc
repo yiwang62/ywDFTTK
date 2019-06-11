@@ -1,0 +1,448 @@
+#!/bin/tcsh
+
+unalias cp
+unalias mv
+unalias rm
+
+set POTPBE = "$HOME/bin/VASP/POT/potpaw_PBE/"
+set POTGGA = "$HOME/bin/VASP/POT/potpaw_GGA/"
+set POTLDA = "$HOME/bin/VASP/POT/potpaw_LDA/"
+set PY = "$HOME/bin/pycode/"
+
+set POT = ""
+
+set encutS = 1.3
+set N_kpoint=16
+set K_TYPE="G"
+
+set nomagnetic = 0
+set FM = ""
+
+set objdir = "S-Al"
+
+set nn = 0
+set ENCUT = ""
+
+
+foreach option ( $* )
+  if (x$1 == "x-objdir") then
+    shift
+    set objdir = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-FM") then
+    set FM = "-FM"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-ENCUT") then
+    shift
+    set ENCUT = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-GGA") then
+    set POT = "$POTGGA"
+  else if (x$1 == "x-PBE") then
+    set POT = "$POTPBE"
+  else if (x$1 == "x-LDA") then
+    set POT = "$POTLDA"
+  else if (x$1 == "x-pot") then
+    shift
+    set newPOT = "$1"
+    if ( ! -e :config ) then
+      echo "pseudopotial:""$newPOT" >>:config
+    endif
+    set POT = "$newPOT"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-py") then
+    shift
+    set newPY = "$1"
+    echo "python:""$newPY" >>:config
+    set PY = "$newPY"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-LDAU") then
+    set LDAU
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-addstr") then
+    set addstr
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-renew") then
+    set renew
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-norelax") then
+    set norelax
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-addV") then
+    shift
+    set addV = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-Nk") then
+    shift
+    set N_kpoint = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-nomagnetic") then
+    set nomagnetic = 1
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-insulator") then
+    set insulator = 1
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-l") then
+    shift
+    if ( "$nn" == 0 ) then
+      set llist = "$1"
+    else
+      set llist = "$llist $1"
+    endif
+    @ nn = "$nn" + 1
+    shift
+    continue
+  else if (x$1 == "x-ll") then
+    shift
+    set l0 = "$1"
+    shift
+    set l1 = "$1"
+    shift
+    set lc = "$1"
+    shift
+    set nx = `ari -n -f %8.0f $l1 - $l0 / $lc`
+    set nb = 0
+    while ( "$nb" <= "$nx" )
+      set lx = `ari -n -f %9.3f $lc x $nb + $l0`
+      if ( "$nn" == 0 ) then
+        set llist = "$lx"
+      else
+        set llist = "$llist $lx"
+      endif
+      @ nn = "$nn" + 1
+      @ nb = "$nb" + 1
+    end
+    continue
+  else if (x$1 == "x-HIGH") then
+    set HIGH 
+    shift
+    set encutS="$1"
+    shift
+    continue
+  else if (x$1 == "x-PREC") then
+    shift
+    set PREC="$1"
+    shift
+    continue
+  else if (x$1 == "x-ISMEAR") then
+    shift
+    set ISMEAR="$1"
+    shift
+    continue
+  else if (x$1 == "x-POTIM") then
+    shift
+    set POTIM="$1"
+    shift
+    continue
+  else if (x$1 == "x-SMASS") then
+    shift
+    set SMASS="$1"
+    shift
+    continue
+  else if (x$1 == "x-IBRION") then
+    shift
+    set IBRION="$1"
+    shift
+    continue
+  else if (x$1 == "x-T") then
+    shift
+    set SIGMA=`python -c "print ($1*8.6173303e-5)"`
+    shift
+    continue
+  else if (x$1 == "x-SIGMA") then
+    shift
+    set SIGMA="$1"
+    shift
+    continue
+  else if (x$1 == "x-SYMPREC") then
+    shift
+    set SYMPREC="$1"
+    shift
+    continue
+  else if (x$1 == "x-EDIFF") then
+    shift
+    set EDIFF="$1"
+    shift
+    continue
+  else if (x$1 == "x-NSW") then
+    shift
+    set NSW="$1"
+    shift
+    continue
+  else
+    if ( "$#argv" == 0 ) break
+    if ( -d $1 ) then
+      set objdir = "$1"
+    else
+      echo "************ERROR option: $1"
+      exit
+    endif
+    if ( "$#argv" != 0 ) shift
+    continue
+  endif
+end
+
+if ( "$POT" == "" ) then
+  if ( -e :config ) then
+    set xxx = `grep "pseudopotial:" :config | tail -1 | sed "s/pseudopotial://g"`
+    if ( "$xxx" != "" ) set POT = "$xxx"
+  else
+    set POT = "$POTPBE"
+    echo "pseudopotial:""$POT" >>:config
+  endif
+else
+  set rec = "pseudopotial:""$POT"
+  set xxx = ""
+  if ( -e :config ) then
+    set xxx = `grep "pseudopotial:" :config | tail -1`
+  endif
+  if ( "$rec" != "$xxx" ) then
+    echo "pseudopotial:""$POT" >>:config
+  endif
+endif
+
+set list0 = "0.955 0.970 0.985 1.000 1.015 1.030 1.045"
+if ( ! $?llist ) set llist = "0.955 0.970 0.985 1.000 1.015 1.030 1.045"
+set g0 = "`where MKstruc | head -1`"
+set gg = $g0:h
+set srcdir = $gg/"Frame"
+set hh = `pwd`
+
+if ( $?addV ) then
+  #set subpos = "`ls -F $objdir/$addV*.VASP $objdir/$addV*.vasp`"
+  #set subdir = "`ls -F $objdir/$addV*.VASP $objdir/$addV*.vasp | sed 's/.VASP//g;s/.vasp//g'`"
+  set subpos = "`ls -F $objdir/$addV.VASP $objdir/$addV.vasp`"
+  set subdir = "`ls -F $objdir/$addV.VASP $objdir/$addV.vasp | sed 's/.VASP//g;s/.vasp//g'`"
+else
+  set subpos = "`ls -F $objdir/*.VASP $objdir/*.vasp`"
+  set subdir = "`ls -F $objdir/*.VASP $objdir/*.vasp | sed 's/.VASP//g;s/.vasp//g'`"
+endif
+
+set elements = ""
+foreach d ( $subpos ) 
+  dos2unix -q $d
+  set eled = `head -6 $d | tail -1`
+  set elements = "$elements $eled "
+end
+
+if ( "$ENCUT" == "" ) then
+  set encut = `python $PY/getEncut.py $elements`
+  set encutH = `python -c "print ($encut * $encutS)"`
+else
+  set encutH = "$ENCUT"
+endif
+
+echo $elements $encutH
+
+#set mass = `$PY/getDymass.py -im $impurity -mat $fccNi`
+
+sed "s|PYPATH|$PY|g" <$srcdir/Crun >$objdir/Crun
+chmod u+x $objdir/Crun
+sed "s|PYPATH|$PY|g" <$srcdir/CrunPH >$objdir/CrunPH
+chmod u+x $objdir/CrunPH
+
+foreach d ( $subdir ) 
+    if ( $?addstr && -e $d ) continue
+    if ( ! -e $d ) mkdir $d
+    set pos = $hh/$d".VASP"
+    if ( ! -e $pos ) set pos = $hh/$d".vasp"
+    cd $d
+    #cp $srcdir/frame/* .
+    foreach f ( $srcdir/frame/* )
+      if ( ! -d $f ) then
+	set ff = $f:t
+	sed "s/$list0/$llist/g" <$f >$ff
+	chmod u+x $ff
+      endif
+    end
+    if ( ! -e tplate ) mkdir tplate
+    cd tplate
+        cp $srcdir/frame/tplate/* .
+	cp $pos POSCAR
+        set eled = `head -6 POSCAR | tail -1`
+#        head -7 POSCAR | tail -1 >NELECTRONS
+        set eledN = `head -7 POSCAR | tail -1`
+	set natom = `echo $eledN | awk '{ nn=0; for (i=1; i<=NF; i++) nn += $i; print nn;}'`
+        echo $eledN >NELECTRONS
+	$PY/getPot.py $eled -pot $POT >>NELECTRONS
+	#echo python $PY/getPot.py $eled -pot $POT
+#        python $PY/getNEls.py $eled >>NELECTRONS
+
+
+        if ( $?norelax ) then
+          grep -v ISIF INCAR.Relax  >t.m.p.file
+          mv t.m.p.file INCAR.Relax
+          echo "ISIF= 0" >>INCAR.Relax
+        endif
+
+        if ( "$natom" <= 8 ) then
+          grep -v LREAL INCAR.Relax | grep -v LPLANE | grep -v LSCALU | grep -v NSIM >t.m.p.file
+          mv t.m.p.file INCAR.Relax
+          grep -v LREAL INCAR.Static | grep -v LPLANE | grep -v LSCALU | grep -v NSIM >t.m.p.file
+          mv t.m.p.file INCAR.Static
+        endif
+
+        if ( "$nomagnetic" == "1") then
+          grep -i -v ispin INCAR.Relax | grep -i -v magmom | grep -i -v VOSKOWN >t.m.p.file
+          mv t.m.p.file INCAR.Relax
+          grep -i -v ispin INCAR.Static | grep -i -v magmom | grep -i -v VOSKOWN >t.m.p.file
+          mv t.m.p.file INCAR.Static
+          grep -i -v ispin INCAR.PH | grep -i -v magmom | grep -i -v VOSKOWN >t.m.p.file
+          mv t.m.p.file INCAR.PH
+        endif
+
+	if ( $?insulator ) then
+	  set NBANDS = `python $PY/getNBANDS.py`
+          grep -i -v NBANDS INCAR.Relax >t.m.p.file
+          mv t.m.p.file INCAR.Relax
+	  echo "NBANDS= $NBANDS" >>INCAR.Relax
+        endif
+
+	if ( $?SYMPREC ) then
+	   grep -i -v SYMPREC INCAR.Relax >t.m.p.file
+	   mv t.m.p.file INCAR.Relax
+	   echo "SYMPREC= $SYMPREC" >>INCAR.Relax
+	   grep -i -v SYMPREC INCAR.Static >t.m.p.file
+	   mv t.m.p.file INCAR.Static
+	   echo "SYMPREC= $SYMPREC" >>INCAR.Static
+	endif
+pwd
+	if ( $?POTIM ) then
+	   grep -i -v POTIM INCAR.Relax >t.m.p.file
+	   mv t.m.p.file INCAR.Relax
+	   echo "POTIM= $POTIM" >>INCAR.Relax
+	endif
+	if ( $?SMASS ) then
+	   grep -i -v SMASS INCAR.Relax >t.m.p.file
+	   mv t.m.p.file INCAR.Relax
+	   echo "SMASS= $SMASS" >>INCAR.Relax
+	endif
+	if ( $?IBRION ) then
+	   grep -i -v IBRION INCAR.Relax >t.m.p.file
+	   mv t.m.p.file INCAR.Relax
+	   echo "IBRION= $IBRION" >>INCAR.Relax
+	endif
+	if ( $?ISMEAR ) then
+	   grep -i -v ISMEAR INCAR.Relax >t.m.p.file
+	   mv t.m.p.file INCAR.Relax
+	   echo "ISMEAR= $ISMEAR" >>INCAR.Relax
+	endif
+	if ( $?PREC ) then
+	   grep -i -v PREC INCAR.Relax >t.m.p.file
+	   mv t.m.p.file INCAR.Relax
+	   echo "PREC= $PREC" >>INCAR.Relax
+	   grep -i -v PREC INCAR.Static >t.m.p.file
+	   mv t.m.p.file INCAR.Static
+	   echo "PREC= $PREC" >>INCAR.Static
+	endif
+	endif
+	if ( $?SIGMA ) then
+	   grep -i -v SIGMA INCAR.Relax >t.m.p.file
+	   mv t.m.p.file INCAR.Relax
+	   echo "SIGMA= $SIGMA" >>INCAR.Relax
+	endif
+	if ( $?EDIFF ) then
+	   grep -i -v EDIFF= INCAR.Relax >t.m.p.file
+	   mv t.m.p.file INCAR.Relax
+	   echo "EDIFF= $EDIFF" >>INCAR.Relax
+	   grep -i -v EDIFF= INCAR.Static >t.m.p.file
+	   mv t.m.p.file INCAR.Static
+	   echo "EDIFF= $EDIFF" >>INCAR.Static
+	endif
+	if ( $?NSW ) then
+	   grep -i -v NSW INCAR.Relax >t.m.p.file
+	   mv t.m.p.file INCAR.Relax
+	   echo "NSW= $NSW" >>INCAR.Relax
+	endif
+        if ( "$nomagnetic" == "0") then
+	  #head -7 POSCAR | tail -2 >t.m.p.file
+	  #set MAGMOM = `python $PY/mag.py`
+	  set MAGMOM = `head -7 POSCAR | tail -2 | python $PY/mag.py $FM`
+	  echo "$MAGMOM" >>INCAR.Relax
+	  echo "$MAGMOM" >>INCAR.Static
+	  echo "$MAGMOM" >>INCAR.PH
+        endif
+	if ( $?LDAU ) then
+	  echo "LDAU = .TRUE." >t.m.p.file0
+	  echo "LMAXMIX = 6" >>t.m.p.file0
+	  echo "LORBIT = 11" >>t.m.p.file0
+	  head -6 POSCAR | tail -1 >t.m.p.file
+	  python $PY/LDAU.py >>t.m.p.file0
+	  cat t.m.p.file0 >>INCAR.Static
+	  cat t.m.p.file0 >>INCAR.Relax
+	  cat t.m.p.file0 >>INCAR.PH
+	  rm t.m.p.file0
+	endif
+	if ( $?HIGH ) then
+          grep -i -v ENCUT INCAR.Relax >t.m.p.file
+          mv t.m.p.file INCAR.Relax
+          echo ENCUT = $encutH >>INCAR.Relax
+          grep -i -v ENCUT INCAR.PH >t.m.p.file
+          mv t.m.p.file INCAR.PH
+          echo ENCUT = $encutH >>INCAR.PH
+	endif
+
+          grep -i -v ENCUT INCAR.Static >t.m.p.file
+          mv t.m.p.file INCAR.Static
+          echo ENCUT = $encutH >>INCAR.Static
+
+	if ( -e ../../LDAU ) then
+	  cat ../../LDAU >>INCAR.Static
+	  cat ../../LDAU >>INCAR.Relax
+	  cat ../../LDAU >>INCAR.PH
+	endif
+
+        if ( -e ../KPOINTS ) then
+          cp ../KPOINTS .
+        else
+	  set line = `head -6 POSCAR | tail -1`
+	  set _x = `echo $line | awk '{print $1}' | sed 's/[^0-9]//g'`
+	  if ( "$_x" == "" ) then
+	    set line = `head -7 POSCAR | tail -1`
+	  endif
+
+	  set natom = `echo $line | awk '{ nn=0; for (i=1; i<=NF; i++) nn += $i; print nn;}'`
+	  set Nk = `python -c "print (($N_kpoint ** 3 / $natom) ** .33333333333)"`
+
+          set K_LENGTH=`kvecl $Nk <POSCAR`
+          sed "s|K_LENGTH|$K_LENGTH|g;s|K_TYPE|$K_TYPE|g" < $srcdir/frame/tplate/KPOINTS >KPOINTS
+	  set Nk = `python -c "print ((10 ** 3 / $natom) ** .33333333333)"`
+          set K_LENGTH=`kvecl $Nk <POSCAR`
+          sed "s|K_LENGTH|$K_LENGTH|g;s|K_TYPE|$K_TYPE|g" < $srcdir/frame/tplate/KPOINTS >KPOINTS.10
+	  set Nk = `python -c "print ((16 ** 3 / $natom) ** .33333333333)"`
+          set K_LENGTH=`kvecl $Nk <POSCAR`
+          sed "s|K_LENGTH|$K_LENGTH|g;s|K_TYPE|$K_TYPE|g" < $srcdir/frame/tplate/KPOINTS >KPOINTS.16
+cat <<end_end >>KPOINTS.G
+Zr 15x15x15
+ 0
+G
+1 1 1
+ 0 0 0
+end_end
+        endif
+    cd ..
+
+    if ( $?renew ) then
+      cd tplate
+        cp INCAR.Relax INCAR
+      cd ..
+    else
+      mcmd -Relax
+    endif
+    cd $hh
+end
+
+cd $objdir;deMag

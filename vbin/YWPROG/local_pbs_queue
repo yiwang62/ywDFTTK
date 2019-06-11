@@ -1,0 +1,51 @@
+#!/bin/tcsh -f
+#
+
+set machine = `hostname | tr '.aset.psu.edu' ' '`
+
+if ( -e ~/.eecc_resource ) then
+
+   set machine = `hostname`
+   cat ~/.eecc_resource | awk -F\\n "/$machine/,/\/$machine/" | grep -v "$machine" | grep -v "\$machine" >t.m.p.file
+
+   set string = "QUEUENAME"
+   set qlist =  "`grep \:$string\: t.m.p.file | sed 's|\:$string\:||g'`"
+
+else
+
+  set qlist = 'lionxl lionxl-msc lionxl-matcase lionxm lionxo'
+
+endif
+
+set local_list = ""
+
+if ( $1 != "" ) then
+	set value = "$1"
+else
+	set value = "djafjkdsfjklsfehjasf"
+endif
+
+foreach i ( $qlist )
+#	echo $i | grep $machine >/dev/null
+#	if ( $status == 0 ) then
+		if ( "$local_list" == "" ) then
+			set local_list = "$i"
+			set default = $i
+		else
+			set local_list = "$local_list,$i"
+		endif
+#	endif
+end
+
+if ( "$local_list" == "" ) then
+  echo "******** ERROR! No PBS resource defined in .eecc_resource!"
+  exit
+endif
+echo $local_list | grep $value >/dev/null
+if ( $status == 0 ) then
+	echo $value
+else
+	echo $default
+endif
+
+echo ComboBox $local_list

@@ -1,0 +1,18 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+set x = $s:h
+set d = $x:t
+
+if ( ! (-e sop) ) then
+  mkdir sop
+endif
+foreach dir ( $d$h/vol_* )
+    set f1 = `echo $dir | sed "s|$d$h/vol_||"`
+    set efile = $dir/eigenfreq.out
+    set dfile = dfile
+    if ( -e $efile && ! (-z $efile) ) then
+        atafre $dfile $efile 3 | fph> sop/$f1.sop
+    endif
+end

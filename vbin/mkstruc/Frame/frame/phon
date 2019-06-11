@@ -1,0 +1,33 @@
+#!/bin/csh -f
+#
+
+unalias cp
+
+set PHdir = phonon
+foreach option ( $* )
+  if (x$1 == "x-dir") then
+    if ( $#argv != 0 ) shift
+    set PHdir = "$1"
+    continue
+  else if (x$1 != "x") then
+    if ( $#argv != 0 ) shift
+  endif
+end
+
+if ( ! -e $PHdir ) then
+  mkdir $PHdir
+else 
+  exit
+endif
+cd  $PHdir
+
+cp ../vaspbe .
+vaspbe
+
+mkdir tplate
+cp ../tplate/POTCAR.gz tplate
+cp ../tplate/KPOINTS tplate
+cp ../tplate/INCAR.PH tplate/INCAR
+cp ../jrunPH jrun
+
+cd ..

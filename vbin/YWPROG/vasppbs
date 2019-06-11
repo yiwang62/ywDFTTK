@@ -1,0 +1,160 @@
+#!/bin/tcsh -f
+#
+set machine = `hostname | tr '.aset.psu.edu' ' '`
+
+set nnode = 8
+set ppn = 1
+set walltime = "96:00"
+set queue = `local_pbs_queue | head -1`
+set notmpdir = 0
+set nopbs = 0
+
+set tmp = `pwd`
+set suffix = "$tmp:t"
+set tmp1 = $tmp:h
+set prefix = $tmp1:t
+
+foreach option ( $* )
+  if (x$1 == "x-node") then
+    shift
+    set nnode="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-ppn") then
+    shift
+    set ppn="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-JN") then
+    shift
+    set prefix="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-Q") then
+    shift
+    set queue="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-W") then
+    shift
+    set walltime="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-notmpdir") then
+    if ( "$#argv" != 0 ) shift
+    set notmpdir = 1
+    continue
+  else if (x$1 == "x-nopbs") then
+    if ( "$#argv" != 0 ) shift
+    set nopbs = 1
+    continue
+  else
+    if ( "$#argv" == 0 ) break
+    set walltime="$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  endif
+end
+
+set tmp = "B$suffix$prefix"
+set jobname = `printf "%.12s" $tmp`
+
+if (  -e ~/.eecc_resource ) then
+
+   set machine = `hostname`
+   cat ~/.eecc_resource | awk -F\\n "/$machine/,/\/$machine/" | grep -v "$machine" | grep -v "\$machine" >t.m.p.file
+
+   set string = "VSPCMD_parallel"
+   set $string =  "`grep $string t.m.p.file | sed 's|\:$string\:||g'`"
+   set string = "VSPCMD_serial"
+   set $string =  "`grep $string t.m.p.file | sed 's|\:$string\:||g'`"
+   set string = "CONNECTION"
+   set $string =  "`grep $string t.m.p.file | sed 's|\:$string\:||g'`"
+   set string = "SCRATCH_ROOT"
+   set $string =  "`grep $string t.m.p.file | sed 's|\:$string\:||g'`"
+
+
+   set QUEUE = "$queue"
+   if ( "$CONNECTION" == "" ) then
+      set NODES = "nodes=$nnode"":ppn=$ppn"
+   else
+      set NODES = "nodes=$nnode"":$CONNECTION":"ppn=$ppn"
+   endif
+   set VSPCMD = "$VSPCMD_parallel"
+   set npr = `ari -n -f %3.0f $nnode x $ppn`
+   if ( "$npr" == "1" ) set VSPCMD = "$VSPCMD_serial"
+
+   #echo $QUEUE
+   #echo $NODES
+   #echo $VSPCMD
+   #echo $SCRATCH_ROOT
+
+   unalias rm
+   rm t.m.p.file
+
+else
+
+if ( "$machine" == "lionxl" ) then
+  set QUEUE = "$queue"
+  set NODES = "nodes=$nnode"":quadrics:ppn=$ppn"
+  set VSPCMD = "mscrun vasp qmpi"
+  set npr = `ari -n -f %3.0f $nnode x $ppn`
+  if ( "$npr" == "1" ) set VSPCMD = "mscrun vasp serial"
+else if ( "$machine" == "lionxm" ) then
+  set QUEUE = "lionxm"
+  set NODES = "nodes=$nnode"":myrinet:ppn=$ppn"
+  set VSPCMD = "mscrun vasp mmpi"
+  set npr = `ari -n -f %3.0f $nnode x $ppn`
+#  if ( "$npr" == "1" ) set VSPCMD = "mscrun vasp serial"
+  if ( "$npr" == "1" ) set VSPCMD = "vasp.4.6.linux"
+else if ( "$machine" == "lionxo" ) then
+  set QUEUE = "lionxo"
+  set NODES = "nodes=$nnode"
+  set ppn = 1
+#  set VSPCMD = 'time /usr/global/bin/mpirun /usr/global/vasp/iba/bin/vasp'
+  set VSPCMD = 'time /usr/global/bin/empirun /usr/global/vasp/gige/bin/vasp'
+  set npr = `ari -n -f %3.0f $nnode x $ppn`
+  if ( "$npr" == "1" ) set VSPCMD = "vasp.4.6_64"
+endif
+set SCRATCH_ROOT = "/scratch"
+
+endif
+
+#set SCRATCH_ROOT = "/home4/yuw3/tmp"
+
+set quote = '"'
+if ( "$notmpdir" == "0" ) then
+  set hhhh = $HOME"/"
+  set pwdc = `pwd`
+  set Name = $pwdc:t
+  set tpwd = `echo $pwdc | sed "s|$hhhh||g;s|/|_|g"`
+  set USER = "`whoami`"
+  if ( ! ( -e "$SCRATCH_ROOT/$USER" ) ) mkdir "$SCRATCH_ROOT/$USER"
+  set tmpdir = "$SCRATCH_ROOT/$USER/$tpwd"
+  set pt = "set tmpdir = $quote$tmpdir$quote"
+endif
+
+set wd = ":00"
+set ph = "#\!/bin/csh -f"
+set pn = "#PBS -N $jobname"
+set pq = "#PBS -q $QUEUE"
+set pl1 = "#PBS -l $NODES"
+set pl2 = "#PBS -l walltime=$walltime$wd"
+set pv = "set VSPCMD = $quote$VSPCMD$quote"
+
+if ( "$nopbs" == "0" ) then
+echo $ph
+echo $pn
+echo $pq
+echo $pl1
+echo $pl2
+echo $pv
+if ( "$notmpdir" == "0" ) then
+  echo $pt
+endif
+else if ( "$notmpdir" == "0" ) then
+  echo $tmpdir
+endif
+echo "unalias cp"
+echo "unalias rm"
+

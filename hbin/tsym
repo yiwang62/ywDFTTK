@@ -1,0 +1,9 @@
+#
+unalias rm
+set database = "~/bin/hbin/IN718.dat"
+set ecldatabase = "~/bin/hbin/eclIN718.dat"
+rm $database $ecldatabase
+set list = "IN718 CoIN718 FeIN718 exIN718 nnIN718 ooIN718 orIN718 ppIN718 xxIN718 yyIN718 zzIN718 ssIN718 bbIN718c bbIN718a adIN718 adIN718a ccIN718"
+foreach dd ( $list )
+   cd ~/prj/EV/$dd; pwd; vaspsym -debug
+end

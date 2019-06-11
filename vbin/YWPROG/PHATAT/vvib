@@ -1,0 +1,51 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+set x = $s:h
+set d = $x:t
+
+set indir = $h$d
+set pFR = _FR
+set VOL = "vol_0"
+
+foreach option ( $* )
+  if (x$1 == "x-h") then
+    echo "USAGE: vvib     [-fr FR]"
+    echo "                [-T1 T1]"
+    echo "                [-dT dT]"
+    exit
+  endif
+  if (x$1 == "x-p") then
+    shift
+    set indir = "$1"
+    shift
+    continue
+  else if (x$1 == "x-fr") then
+    shift
+    if ( x$1 != "Default" ) set pFR=$1
+    shift
+    continue
+  else if (x$1 == "x-vol") then
+    shift
+    if ( x$1 != "xDefault" ) set VOL=$1
+    shift
+    continue
+  else if ($#argv == "0") then
+    break
+  else
+#    echo "********ERROR: Unknown option $1"
+    shift
+    if ($#argv != "0") continue
+  endif
+end
+
+
+cd $indir
+FITFC -fr=$pFR -f -fn -df=../DFILE
+cd ..
+cd $indir/$VOL
+set nf = `head -1 eigenfreq.out | wc -w`
+atafre ../../DFILE eigenfreq.out $nf | fph
+cd ../..
+

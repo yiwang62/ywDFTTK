@@ -1,0 +1,51 @@
+#!/bin/csh -f
+#
+
+unalias rm
+unalias cp
+unalias mv
+
+set line = `head -6 E/*/vol_0/POSCAR.static | tail -1`
+set natom = `echo $line | awk '{ nn=0; for (i=1; i<=NF; i++) nn += $i; print nn;}'`
+
+echo -n >t.m.p.file
+
+foreach dir ( E/*/vol* )
+    set pfile = $dir/POSCAR.static
+    set efile = $dir/OSZICAR.static
+    set ofile = $dir/OUTCAR.static.gz
+    set vdir = $dir:t
+
+if ( -e $ofile && ! (-z $ofile) ) then
+
+        set tmp = `vasp_volume <$pfile`
+        set vol0 = `ari -n $tmp/$natom`
+        set tmp = `grep "E0=" $efile | tail -1 | awk '{print $5}'`
+        set ene0 = `ari -n $tmp/$natom`
+        set tmp = `grep "E0=" $efile | tail -1 | awk '{print $10}'`
+        set mag0 = `ari -n $tmp/$natom`
+        printf "%10.6lf %11.6lf %10.4lf" "$vol0" "$ene0" "$mag0" >>t.m.p.file
+
+foreach hh ( STRAIN_TYPE )
+
+foreach ee ( STRAIN_LIST )
+    set d = X"$hh""$ee"/*/$vdir
+    set efile = $d/OSZICAR.static
+    if ( ! ( -e $efile ) ) set WARNING
+
+    if ( -e $efile && ! (-z $efile) ) then
+        set tmp = `grep "E0=" $efile | tail -1 | awk '{print $10}'`
+        set mag = `ari -n $tmp/$natom`
+        printf " %10.4lf" "$mag" >>t.m.p.file
+    endif
+end
+
+end
+
+    printf "\n" >>t.m.p.file
+
+endif
+
+end
+
+sort -k 1 -n t.m.p.file

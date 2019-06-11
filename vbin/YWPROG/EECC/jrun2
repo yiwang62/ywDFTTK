@@ -1,0 +1,19 @@
+#!/bin/csh -f
+#
+
+mcmd
+
+foreach ee ( STRAIN_LIST )
+foreach hh ( STRAIN_TYPE )
+    set d = X"$hh""$ee"
+
+	if ( -e $d ) then
+        cd $d
+jrun2 $*
+        cd ..
+	else
+	    echo "********ERROR: WORKDIR is not created yet"
+	    exit;
+	endif
+end
+end

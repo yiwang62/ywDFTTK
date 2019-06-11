@@ -1,0 +1,102 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+
+set dollar1 = '$1'
+set add = '>&'
+set q = '"'
+set pbsop = ""
+set Ochk = ""
+set clean = "clean"
+set save = "full"
+unalias mv
+unalias cp
+unalias rm
+
+foreach o ( $* )
+  if ( "$o" == "-ochk" ) then
+    set Ochk = "check"
+  else if ( "$o" == "-brief" ) then
+    set save = "brief"
+  else if ( "$o" == "-noclean" ) then
+    set clean = "noclean"
+  else
+    set pbsop = "$pbsop $o"
+  endif
+end
+
+set jobfile = "$s"/B-"$h"
+vasppbs $pbsop >$jobfile
+
+foreach ee ( 0.955 0.970 0.985 1.000 1.015 1.030 1.045 )
+    set d = V"$ee"
+
+        set run = 0
+        if ( -e $d ) then
+        if ( "$Ochk" == "check" && -e $d/OSZICAR ) then
+          set run = `grep -v '^$' $d/OSZICAR | tail -1 | grep E0 | wc -l | awk '{print $1}'`
+        endif
+        if ( "$Ochk" != "check" || $run == 0 ) then
+        cd $d
+
+set WORKDIR = "`pwd`"
+set RUNDIR = '$tmpdir'/$d
+set RUNDIRHOME = '$tmpdir'
+set VSPCMD = '$VSPCMD'
+
+cat <<end.end >>$jobfile
+
+
+#
+# Start to run job in $RUNDIR
+#
+if ( !(-e $RUNDIRHOME) ) mkdir $RUNDIRHOME
+if ( !(-e $RUNDIR) ) then
+  mkdir $RUNDIR
+else
+  \rm -r $RUNDIR
+  mkdir $RUNDIR
+endif
+cd $WORKDIR
+unalias cp
+unalias mv
+cp -f ../tplate/KPOINTS  $RUNDIR
+cp -f ../tplate/INCAR    $RUNDIR
+
+if ( -e ../tplate/POTCAR ) then
+  cp -f ../tplate/POTCAR   $RUNDIR
+else if ( -e ../tplate/POTCAR.gz ) then
+  zcat ../tplate/POTCAR.gz   >$RUNDIR/POTCAR
+else if ( -e ../../POTCAR.gz ) then
+  zcat ../../POTCAR.gz   >$RUNDIR/POTCAR
+endif
+
+if ( -e CONTCAR ) then
+  if ( -z CONTCAR ) then 
+    cp -f POSCAR   $RUNDIR
+  else
+    cp -f CONTCAR   $RUNDIR/POSCAR
+  endif
+else    
+  cp -f POSCAR   $RUNDIR
+endif
+
+cd $RUNDIR
+
+$VSPCMD $add $RUNDIR/B-"$h".error
+
+if ( ! -z OSZICAR ) cp -f OSZICAR $WORKDIR/.
+if ( ! -z CONTCAR ) cp -f CONTCAR $WORKDIR/.
+  if ( ! -z OUTCAR ) cp -f OUTCAR $WORKDIR/.
+  if ( ! -z DOSCAR ) cp -f DOSCAR $WORKDIR/.
+
+cd $WORKDIR
+cp $RUNDIR/B-"$h".error .
+end.end
+        cd ..
+        endif
+        endif
+end
+
+sbatch $jobfile

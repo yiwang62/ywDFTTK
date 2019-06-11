@@ -1,0 +1,41 @@
+#!/bin/tcsh -f
+#
+
+unalias ls
+set nonomatch
+
+set local_list = ""
+
+if ( $1 != "" ) then
+	set value = "$1"
+else
+	set value = "djafjkdsfjklsfehjasf"
+endif
+
+set filter = '*/vasp.wrap'
+set line = `echo $filter`
+#echo "line=|$line|"
+if ( "$line" == "$filter" ) then
+	echo "Default"
+	echo "Default"
+	exit
+endif
+
+foreach pi ( `ls $filter` )
+	set i = $pi:h
+		if ( "$local_list" == "" ) then
+			set local_list = "$i"
+			set default = $i
+		else
+			set local_list = "$local_list,$i"
+		endif
+end
+
+echo $local_list | grep $value >/dev/null
+if ( $status == 0 ) then
+	echo $value
+else
+	echo $default
+endif
+
+echo ComboBox $local_list

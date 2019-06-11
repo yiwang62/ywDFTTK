@@ -1,0 +1,62 @@
+#!/bin/csh -f
+#
+set N_kpoint=-2000
+
+foreach option ( $* )
+  if (x$1 == "x-k") then
+    shift
+    set N_kpoint = "$1"
+    shift
+  endif
+end
+
+foreach ee ( STR* )
+    set d = "$ee"
+    if ( ! -d $d ) then
+        mkdir $d
+        echo create $d...
+    else
+        echo renew $d...
+    endif
+        cd $d
+
+cat <<! >INCAR
+System = SQS calculation
+NWRITE = 0
+LWAVE = .FALSE.
+# ISMEAR = -5
+   ISMEAR =      1    -4-tet -1-fermi 1=Methfessel/Paxton 1.order
+   SIGMA  =     .2    broadening in eV
+PREC=accurate
+NSW=30 
+IBRION = 2
+ISIF = 7
+EDIFF=1.e-6
+!
+
+/global/homes/y/yiwang62/bin/SQSVASP/str2poscar
+
+set EMAX=`grep ENMAX POTCAR | awk '{print $3}' | sed 's/\;//g' | sort | tail -1`
+set ENCUT = `ari -n $EMAX x 1.3`
+echo "ENCUT=$ENCUT" >>INCAR
+
+if ( "$N_kpoint" < 0 ) then
+	set natom = `wc -l str.out | awk '{print $1}'`
+	@ natom = "$natom" - 6
+	set kpoint = `ari -n -f %8.0f $N_kpoint / $natom`
+else
+	set kpoint = $N_kpoint
+endif
+
+if ( ! ( -e KPOINTS ) ) then
+set K_LENGTH=`/global/homes/y/yiwang62/bin/SQSVASP/kvecl $kpoint <POSCAR`
+sed "s|K_LENGTH|$K_LENGTH|g" </global/homes/y/yiwang62/bin/SQSVASP/KPOINTS >KPOINTS
+endif
+
+if ( -e ../INCAR ) cp -f ../INCAR .
+
+       	cd ..
+end
+
+
+

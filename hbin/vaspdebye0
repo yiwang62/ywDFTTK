@@ -1,0 +1,40 @@
+#!/bin/csh
+#
+set s = "`pwd`"
+set h = $s:t
+unalias mv
+unalias rm
+set www = `pwd`
+
+set OFILE = "OSZICAR"
+set CFILE = "CONTCAR"
+#set phases = "$1"
+set phasese00 = `awk '{print $1}' e00.dat`
+set phasesa00 = `awk '{print $1}' a00.dat`
+
+foreach dir ( $phasese00 $phasesa00 )
+#foreach dir ( Al/ )
+  cd $www
+  if ( -e $dir/debye/t.out ) then
+    if ( -z $dir/debye/t.out ) rm -r $dir/debye
+  endif
+  if ( -e $dir/debye/t.out ) then
+    set err = `grep '\*\*\*\*'  $dir/debye/t.out | wc -l | awk '{print $1}'`
+    if ( "$err" != 0 ) rm -r $dir/debye
+  endif
+  #if ( -e $dir/debye ) continue
+  cd $dir
+    echo $dir
+    if ( -e good22.dat ) then
+      set nl = "`wc -l <good22.dat`"
+      if ( "$nl" >= "6" ) then
+    #$www/cbak
+        set debye = "debye"
+        if ( ! -e $debye ) mkdir $debye
+        set dat = $debye/data.in
+        echo -n \".\" 1 1 > $dat
+        YWfit -Morse < good22.dat | grep param | awk '{printf " %lf", $3}' >>$dat
+        vaspdebye1 -Static -Morse
+      endif
+    endif
+end

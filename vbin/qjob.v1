@@ -1,0 +1,109 @@
+#!/bin/tcsh
+#
+
+set nonomatch
+set AAAA = "A"
+foreach o ( $* )
+  if ( "$1" == "" ) break
+  if (x$1 == "x-trace") then
+    set trace
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if (x$1 == "x-AAAA") then
+    shift
+    set AAAA = $1
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( -e $1 ) then
+    set www = $1:h
+    cd $www
+    set file = "$AAAA"-*
+    if ( -e $file ) then
+      set line = `tail -1 "$AAAA"-*`
+      goto trace
+    else
+      echo "CANNOT fine file : $file"
+      exit
+    endif
+  else
+    set job = $1
+    if ( "$#argv" != 0 ) shift
+  endif
+  if ( "$#argv" == 0 ) break
+end
+
+if ( -e $job ) goto trace0
+
+set line = `scontrol show job $job | grep Command | sed "s/Command=//g"`
+set j0 = $line:h
+set j1 = "$j0:t""-"
+set j2 = `echo $line | sed "s/$j1/JOB-/g"`
+if ( -e $j2 ) then
+  set j3 = `tail -1 $j2 | sed "s/;//g" | awk '{print $1,$2}'`
+  set outj3 = `echo $j3 | awk '{print $1}'`
+  if ( "$outj3" != "cd" ) then
+    set j3 = "cd $j2:h"
+  endif
+  $j3
+  set line = `tail -1 $j2`
+  if ( $?trace ) goto trace
+else
+  cd $j0
+endif
+pwd
+
+exit
+
+trace0:
+    set dd = $job:h
+    cd $dd
+
+trace:
+    while ( 1 == 1 )
+      set nested = `vaspnest 7200`
+
+      if ( "$nested" == 0 ) then 
+        if ( ! -e nested_run ) then
+          echo "`pwd` : just finished"
+        else
+          echo "`pwd` : running"
+          exit
+        endif
+      else if ( "$nested" == 100 ) then 
+        echo "`pwd` : unstable structure"
+      else if ( ! -e OSZICAR ) then
+        set outcar =  $SCRATCH/`pwd | sed "s|/|_|g;s|_global_project_projectdirs_m891_yiwang62|prj|g"`/OUTCAR
+        set tdir = $outcar:h
+        set t0 = 0
+        if ( -e $outcar ) then
+          set t0 = `stat -c %Y $outcar`
+        endif
+
+        set now = `date +%s`
+        @ now = "$now" - "$t0"
+        if ( "$now" < "7200" ) then
+          break
+        else
+          if ( -e $outcar ) then
+            if  ( ! -e OSZICAR ) then
+              echo "`pwd`: JOB in ERROR"
+            endif
+          else
+            exit
+          endif
+        endif
+      endif
+
+      set f1 = `echo $line | awk '{print $1}'`
+      set f2 = `echo $line | awk '{print $2}' | sed "s/;//g"`
+      set f3 = `echo $line | awk '{print $3}'`
+      if ( "$f1" != "cd" ) break
+      if ( ! -e $f2 ) break
+      cd $f2
+      if ( ! -e $f3 ) break
+      if ( -e OSZICAR ) then
+        echo -n "`pwd`/OSZICAR; "; stat -c %z OSZICAR 
+      endif
+      set line = `tail -1 $f3`
+    end
+    pwd

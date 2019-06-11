@@ -1,0 +1,12 @@
+System = phonon of Zr bcc - omiga
+
+NWRITE = 0
+
+IBRION = 2
+
+EDIFF=1.d-6
+
+ISPIN = 1
+PREC = High
+ISMEAR = 0; SIMGA=0.01
+NSW=0

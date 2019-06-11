@@ -1,0 +1,21 @@
+#!/bin/csh -f
+#
+
+cd E
+    jrun_dvib $*
+cd ..
+
+set ppx = "`pwd`"
+
+foreach ee ( STRAIN_LIST )
+foreach hh ( STRAIN_TYPE )
+
+    set d = X"$hh""$ee"
+
+        cd $d
+	    jrun_dvib $*
+       	cd $ppx
+
+end
+end
+

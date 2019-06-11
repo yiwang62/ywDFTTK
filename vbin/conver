@@ -1,0 +1,5 @@
+#
+set line = 1
+if ( "$2" != "" ) set line = "$2"
+set E0 = `grep E0 $1 | tail -n +$line | head -1 |  awk '{print $5}'`
+grep E0 $1 | tail -n +$line | awk -v E0=$E0 '{print $1, $5-E0}' | YWfit -plot

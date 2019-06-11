@@ -1,0 +1,53 @@
+#!/bin/csh -f
+#
+set s = "`pwd`"
+set h = $s:t
+set x = $s:h
+set d = $x:t
+
+unalias cp
+unalias rm
+set vspcmd = '$VSPCMD'
+set DIR = "`pwd`/$h$d"
+
+cd $DIR
+cp -f ../vasp.wrap3 vasp.wrap
+FITFC
+cd ..
+
+set pbsop = ""
+set Ochk = ""
+foreach o ( $* )
+  if ( "$o" == "-ochk" ) then
+    set Ochk = "check"
+  else
+    set pbsop = "$pbsop $o"
+  endif
+end
+
+foreach dir ( $DIR/vol_*/p* )
+        cd $dir
+
+vasppbs $pbsop >B-"$h"
+set WORKDIR = "`pwd`"
+
+cat <<end.end >>B-"$h"
+cd $WORKDIR
+
+setenv VSPCMD "$vspcmd"
+setenv VSPGGA _POTGGA
+setenv VSPLDA _POTLDA
+
+runstruct_vasp
+rm -f wait
+end.end
+
+        chmod u+x B-"$h"
+if ( !( -e OSZICAR.static ) ) then
+  qsub B-"$h"
+else if ( -z OSZICAR.static ) then
+  qsub B-"$h"
+endif
+	cd $s
+end
+

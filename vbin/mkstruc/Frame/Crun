@@ -1,0 +1,64 @@
+#!/bin/csh
+#
+set s = "`pwd`"
+set h = $s:t
+
+set PY = "/global/project/projectdirs/m891/yiwang62/EV/bin/"
+
+set pbsop = ""
+set node = 96
+
+set Crun = "crun"
+
+foreach o ( $* )
+  if ( "$1" == "-node" ) then
+    shift
+    set node = "$1"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else if ( "$1" == "-Crun" ) then
+    set Crun = "Crun"
+    if ( "$#argv" != 0 ) shift
+    continue
+  else
+    set pbsop = "$pbsop $1"
+    if ( "$#argv" != 0 ) shift
+  endif
+end
+echo $pbsop
+exit
+
+foreach d ( `ls -d */` )
+  if ( -e $d/tplate ) then
+    cd  $d
+      cd tplate
+#        set eled = `head -6 POSCAR | tail -1`
+#        set eledN = `head -7 POSCAR | tail -1`
+#        echo $eledN >NELECTRONS
+#        python $PY/getNEls.py $eled
+        set NBANDS = `python $PY/getNBANDS.py`
+      cd ..
+
+      #set newnode = `python $PY/getNode.py`
+      set newnode = `python -c "print (int(float($NBANDS)/2+0.5001))"`
+      if ( "$newnode" < "1" ) set newnode = 1
+      if ( "$newnode" <= "16" ) then
+	if ("$NERSC_HOST" == "cori" ) then
+          $Crun -node $newnode -Q shared $pbsop
+	else
+          $Crun -node $newnode $pbsop
+	endif
+      else if ( "$newnode" < "$node" ) then
+        $Crun -node $newnode $pbsop
+      else if ( "$node" <= "16" ) then
+	if ("$NERSC_HOST" == "cori" ) then
+          $Crun -node $node -Q shared $pbsop
+	else
+          $Crun -node $node $pbsop
+	endif
+      else
+        $Crun -node $node $pbsop
+      endif
+    cd ..
+  endif
+end
