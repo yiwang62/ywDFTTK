@@ -321,7 +321,8 @@ endINCAR:
 
 echo "\$Conrec" >>Convergence
 
-set ferror = "\`ls -lt $RUNDIR/*.error |& head -1 | awk '{print $9}'\`"
+#set ferror = "\`ls -lt $RUNDIR/*.error |& head -1 | awk '{print $9}'\`"
+set ferror = "\`ls $RUNDIR/*.error |& head -1\`"
 
 if ( -e "\$ferror" ) then
   set b = \`grep "DUE TO TIME LIMIT" \$ferror | wc -l\`
