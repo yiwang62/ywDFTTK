@@ -337,7 +337,9 @@ def makePCF(_els, _nat):
 
 
 def ExcelPhaseName():
-  df = pd.read_excel('2019-02-08-List-Phases.xlsx', sheet_name='model_MP')
+  path = os.path.realpath(__file__)
+  path = path[0:path.rfind('/')]
+  df = pd.read_excel(path+'/2019-02-08-List-Phases.xlsx', sheet_name='model_MP')
   #df = pd.read_excel('2019-02-22-List-Phases.xlsx', sheet_name='model_MP')
   columns = df.columns.values
   for cc in columns:
@@ -449,15 +451,22 @@ return:
 """ 
 
 def outMPdata(posdir, _dstack, calhull, ehull):
-  outESPEI(posdir,_dstack,ehull)
   print ("Compound         Formula           SG Symmetry Tenergy(eV/atom) Fenergy : Primitive POSCAR")
-  dstack = []
-  for ff in _dstack:
-    if ff["hull_energy"] < 1.e-6:
-      dstack.append(ff)
-  for ff in _dstack:
-    if not ff["hull_energy"] < 1.e-6:
-      dstack.append(ff)
+  if calhull : 
+    try:
+        outESPEI(posdir,_dstack,ehull)
+    except:
+        print("outESPEI failed because cannot find the excel file for phase name")
+        pass
+    dstack = []
+    for ff in _dstack:
+      if ff["hull_energy"] < 1.e-6:
+        dstack.append(ff)
+    for ff in _dstack:
+      if not ff["hull_energy"] < 1.e-6:
+        dstack.append(ff)
+  else:
+    dstack = _dstack
 
   for ff in dstack:
     pname = ff["phasename"]
@@ -483,11 +492,15 @@ def outMPdata(posdir, _dstack, calhull, ehull):
       else:
         continue
 
-    spname = posdir + ff["phases"]
+    if calhull:
+      spname = posdir + ff["phases"]
+    else:
+      spname = posdir + ff["phasename"].replace('|','_')
     print(spname+".VASP")
     with open(spname+".VASP",'w') as f0:
       f0.write("{}\n".format(ff["POSCAR"]))
-    kustoutfiles(spname+".VASP")
+    if calhull:
+      kustoutfiles(spname+".VASP")
 
     with open(spname+".KPOINTS",'w') as f0:
       f0.write("{}\n".format(ff["KPOINTS"]))
